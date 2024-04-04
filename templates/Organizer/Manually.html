@@ -1,0 +1,167 @@
+{% extends 'Organizer/Head.html'%}
+{% load static %}
+
+
+{% block content %}
+<br><br><br><br>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body>
+<div class="row">
+    <div class="col-md-6">
+        <form action="" method="post">
+            {% csrf_token %}
+            <table border="1" align="center" cellpadding="10"  >
+    
+                {% for user_data in users_data %}
+                <tr>
+                    <td>
+                        <p>{{ user_data.user }}</p>
+                    </td>
+    
+                    <td>
+                        <select id="room_{{ user_data.id }}" name="room_{{ user_data.id }}"  onchange="onSelectChange(this.value, '{{ user_data.id }}')">
+                            <option value="">Select Room</option>
+                            {% for room in room %}
+                            <option value="{{ room.id }}" {% if user_data.new_rooms == room.number %}selected {% endif %} >
+                                {{ room.number }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+    
+                </tr>
+                {% endfor %}
+                <!-- <tr>
+                    <td colspan="2" align="right"><input type="submit" value="Update" name="btn"></td>
+                </tr> -->
+            </table>
+    
+          
+        </form>
+    </div>
+    
+       <div class="col-md-6">
+        <h4 class="text-center">preferences</h4>
+        <table  align="center" cellpadding="10">
+            <tr>
+                {% for i in rdata %}
+                <td>
+                    <div style="text-align:center;border:1px solid black;margin:22px;padding:20px">
+                    {{i.number}}  - capacity : {{ i.capacity }}
+                    {% for j in data %}
+                    {% if i.number in j.rooms %}
+    
+    
+                        <p>{{j.user}}</p>
+    
+    
+    
+    
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                </td>
+                {% if forloop.counter|divisibleby:4 %}
+            </tr>
+            <tr>
+                {% endif %}
+                {% endfor %}
+    
+        </table>
+       </div>
+</div>
+    <div id="message-container"></div>
+   
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+<!-- <script>
+    $(document).ready(function () {
+        // $('.card-link').click(function (e) {
+        //     e.preventDefault();
+        //     // Perform desired action when the link is clicked
+        // });
+
+        $("#room").change(function () {
+            var studentId = $(this).val();
+            alert(studentId)
+            $.ajax({
+                url: '/ajax/manual/',
+                data: { studentId: studentId, },
+                type: 'GET',
+
+                success: function (response) {
+                    $('#resume-section').html(response);
+                },
+                error: function (xhr, status, error) {
+                    console.log(error);
+                }
+            });
+        });
+    });
+</script> -->
+<script>
+    function onSelectChange(selectedValue, userId) {
+        // Use the selectedValue and userId to perform your AJAX call
+        // For example, using jQuery AJAX
+        $("#message-container").html(""); 
+        $.ajax({
+            type: "GET",
+            url: "{% url 'org:ajax_manual' %}",  // Replace 'your_ajax_view_url' with the URL of your AJAX view
+            data: {
+                selected_value: selectedValue,
+                user_id: userId
+            },
+            success: function (data) {
+            // Handle the response from the server
+            if (data.message === "Success") {
+                // Room is available, perform actions as needed
+                console.log(data);
+            } else if (data.message === "Error") {
+                // Room is not available, show the error message
+                // console.log(data);
+                var i =0;
+                alert(data.result);
+                // {% for message in messages %}
+                // Use the same message code in the HTML page
+                
+                // var alertClass = "alert ";
+                // if ("{{ message.tags }}" === "success") {
+                //     alertClass += "alert-success";
+                // } else if ("{{ message.tags }}" === "error") {
+                //     alertClass += "alert-danger";
+                // }
+
+                // var alertHTML = '<div class="alert alert-danger alert-dismissible fade show" data-timeout="3000" role="alert">'
+                //                + "{{ message }}"
+                //                + '<button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'
+                //                + '</div>';
+                // $("#message-container").html(alertHTML);
+                // {% endfor %}
+               
+            }
+        },
+        error: function (xhr, textStatus, errorThrown) {
+            // Handle error if the AJAX call fails
+            console.log(errorThrown);
+        }
+        });
+    }
+    </script>
+    
+</body>
+
+</html>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+
+{% endblock content %}

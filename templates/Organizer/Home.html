@@ -1,0 +1,49 @@
+{% extends 'Organizer/Head.html'%}
+{% load static %}
+{%  block content %}
+<br><br><br><br>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form action="" method="post">
+        {% csrf_token %}
+        <table align="center" cellpadding="10">
+            <tr>
+                <td colspan="4" align="center">
+                    <a href="{% url 'org:event' %}"><img src="{% static 'Img/add.png'%}">
+                    <p>Create event</p>
+                </a>
+                </td>
+
+            </tr>
+           <tr>
+            {% for i in data %}
+              
+            <td>
+              <a href="{% url 'org:eventview' i.id %}" style="text-decoration: none;">
+                <div style="text-align:center;border:1px solid black;margin:22px;padding:20px">
+
+                    <p>{{i.code}}</p>
+                  
+                </div></a>
+            </td>
+            {% if forloop.counter|divisibleby:4 %}
+        </tr>
+        <tr>
+            {% endif %}
+
+
+            {% endfor %}
+            
+        </table>
+    </form>
+</body>
+</html>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}

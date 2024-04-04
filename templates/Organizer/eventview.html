@@ -1,0 +1,67 @@
+{% extends 'Organizer/Head.html'%}
+{% load static %}
+{% block content %}
+<br><br><br><br>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <form action="" method="post">
+        {% csrf_token %}
+        <table border="1" align="center" cellpadding="10">
+            <tr>
+                <th>Event Code</th>
+                <th>Rooms Alloted</th>
+                <th>Action</th>
+            </tr>
+            <tr>
+                <td>{{data.code}}</td>
+                <td>{{data.rooms}}</td>
+                <td>
+                    {% if data.status == 1 %}
+                    <a href="{% url 'org:status' data.id %}">Status</a> |
+                    {% if data.is_private %}
+                    <a href="{% url 'org:view_code' data.id %}">Viewcode</a> |
+                    {% endif %}
+                    <a href="{% url 'org:result' data.id %}">Result</a> |
+                    <a href="{% url 'org:manuualy' data.id %}">Edit Result</a> |
+                    <a href="{% url 'org:reopen' data.id %}">Re Open Event</a> |
+                    <a href="{% url 'org:deleteevent' data.id %}">Delete Event</a>
+                    {% else %}
+                    <p>
+                        <a href="{% url 'org:editevent' data.id %}">Edit EventCode</a> |
+                        {% if data.is_private %}
+                        <a href="{% url 'org:view_code' data.id %}">Viewcode</a> |
+                        <a href="{% url 'org:add_capacity' data.id %}">Add Event Capacity</a> |
+                        {% endif %}
+                        <a href="{% url 'org:change_capacity' data.id %}">Change Group Capacity</a> |
+                        <a href="{% url 'org:status' data.id %}">Status</a> |
+                        <a href="{% url 'org:result' data.id %}">Result</a> |
+                        <a href="{% url 'org:manuualy' data.id %}">Edit Result</a> |
+                        <a href="{% url 'org:finishevent' data.id %}">Finish</a>
+                      
+                    </p>
+
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </form>
+    {% if mess == 1 %}
+    <script>
+        alert("This Event is finished you can view the results");
+        window.location = "../../eventview/{{data.id}}";
+    </script>
+
+    {% endif %}
+</body>
+
+</html>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}

@@ -1,0 +1,57 @@
+{% extends 'Guest/Head.html'%}
+{% load static %}
+{%  block content %}
+<br><br><br><br>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h4 class="text-center">Change Preference</h4>
+    <form action="" method="post" id="groupform"  data-group-url="{% url 'Guest:groups'%}">
+        {% csrf_token %}
+        <table align="center" cellpading="10">
+            {% for i in data %}
+            <tr>
+                <td>{{i.number}} Interested</td>
+                <td>
+                    <input type="checkbox" name="inte" id="" value="{{i.number}}" class="selc"
+                           {% if i.number in user_preferences %}checked{% endif %}>Yes
+                </td>
+            </tr>
+            {% endfor %}
+            <tr>
+                <td colspan="2" align="right"><input type="submit" value="Submit" name="btn"></td>
+            </tr>
+        </table>
+        {% if mess %}
+        <script>
+            alert("You have Changed your Interest Wait For Results Updates");
+            window.location="";
+        </script>
+        {% endif %}
+    </form>
+</body>
+</html>
+<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script>
+    $(".selc").change(function () {
+        var did = $(this).val();
+        var cid=$(this).attr('alt');
+        //alert(did); 
+        var ur = $("#groupform").attr("data-group-url");
+        $.ajax({
+            url: ur,
+            data: { did: did,cid:cid },
+            success: function (data) {
+               
+            },
+        });
+       
+    }); -->
+</script>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}

@@ -1,0 +1,27 @@
+<!-- change_capacity.html -->
+{% extends 'Organizer/Head.html'%}
+{% load static %}
+{%  block content %}
+<br><br><br><br>
+<!-- change_capacity.html -->
+
+<form method="post">
+    {% csrf_token %}
+    <h3 class="text-center">Change capacity of Rooms</h3>
+    <table align="center">
+        {% for room in rooms %}
+            <tr>
+                <td>{{ room.number }} Capacity:</td>
+                <td><input type="number" name="room_{{ room.number }}_capacity" value="{{ room.capacity }}" required></td>
+            </tr>
+           
+        {% endfor %}
+        <tr colspan="2">
+            <td colspan="2" align="right"><input type="submit" value="Next" id="submit" name="btn"></td>
+        </tr>
+    </table>
+    
+</form>
+
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}

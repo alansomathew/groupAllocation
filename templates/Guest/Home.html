@@ -1,0 +1,116 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zxx">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="Manup Template">
+    <meta name="keywords" content="Manup, unica, creative, html">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Groupy</title>
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css?family=Work+Sans:400,500,600,700,800,900&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Poppins:400,500,600,700&display=swap" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
+
+    <!-- Css Styles -->
+    <link rel="stylesheet" href="{% static 'Main/css/bootstrap.min.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'Main/css/font-awesome.min.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'Main/css/elegant-icons.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'Main/css/owl.carousel.min.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'Main/css/magnific-popup.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'Main/css/slicknav.min.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'Main/css/style.css' %}" type="text/css">
+</head>
+
+<body>
+    <!-- Page Preloder -->
+    <div id="preloder">
+        <div class="loader"></div>
+    </div>
+
+    <!-- Header Section Begin -->
+    <header class="header-section">
+        <div class="container">
+            <div class="logo" style="padding-top: 15px !important;">
+                <a href="{% url 'home' %}">
+                    <img src="{% static 'img.png' %}" alt="" width="150" height="150">
+                </a>
+            </div>
+            <div class="nav-menu" style="padding-top:36px ;">
+                <nav class="mainmenu mobile-menu">
+                    <ul>
+                        <li class="active"><a href="{% url 'home' %}">Home</a></li>
+                        <li><a href="{% url 'login' %}">Orgaziner</a></li>
+                        <!-- <li><a href="./speaker.html">Participe</a>
+                            <ul class="dropdown">
+                                <li><a href="#">Jayden</a></li>
+                                <li><a href="#">Sara</a></li>
+                                <li><a href="#">Emma</a></li>
+                                <li><a href="#">Harriet</a></li>
+                            </ul>
+                        </li>
+                        <li><a href="./schedule.html">Schedule</a></li>
+                        <li><a href="./blog.html">Blog</a></li>
+                        <li><a href="./contact.html">Contacts</a></li> -->
+                    </ul>
+                </nav>
+                
+            </div>
+            <div id="mobile-menu-wrap"></div>
+        </div>
+    </header>
+    <!-- Header End -->
+
+    <!-- Hero Section Begin -->
+    <section class="hero-section " data-setbg="{% static 'Main/img/hero.jpg' %}">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-12">
+                    
+                    <div id="carouselExampleAutoplaying" class="carousel slide" data-bs-ride="carousel">
+                        <div class="carousel-inner">
+                          <div class="carousel-item active">
+                            <img src="{% static 'Img/img1.jpg' %}" class="d-block w-100" alt="...">
+                          </div>
+                          <div class="carousel-item">
+                            <img src="{% static 'Img/img3.jpg' %}" class="d-block w-100" alt="...">
+                          </div>
+                          <div class="carousel-item">
+                            <img src="{% static 'Img/img5.jpg' %}" class="d-block w-100" alt="...">
+                          </div>
+                        </div>
+                        <button class="carousel-control-prev" type="button" data-bs-target="#carouselExampleAutoplaying" data-bs-slide="prev">
+                          <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                          <span class="visually-hidden">Previous</span>
+                        </button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#carouselExampleAutoplaying" data-bs-slide="next">
+                          <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                          <span class="visually-hidden">Next</span>
+                        </button>
+                      </div>
+                </div>
+            </div>
+        </div>
+      
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm"
+        crossorigin="anonymous"></script>
+    <!-- Js Plugins -->
+    <script src="{% static 'Main/js/jquery-3.3.1.min.js' %}"></script>
+    <script src="{% static 'Main/js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'Main/js/jquery.magnific-popup.min.js' %}"></script>
+    <script src="{% static 'Main/js/jquery.countdown.min.js' %}"></script>
+    <script src="{% static 'Main/js/jquery.slicknav.js' %}"></script>
+    <script src="{% static 'Main/js/owl.carousel.min.js' %}"></script>
+    <script src="{% static 'Main/js/main.js' %}"></script>
+</body>
+
+</html>

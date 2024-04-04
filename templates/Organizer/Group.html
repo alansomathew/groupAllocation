@@ -1,0 +1,103 @@
+{% extends 'Organizer/Head.html'%}
+{% load static %}
+{%  block content %}
+<br><br><br><br>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body bgcolor="cyan">
+    <h3 class="text-center fw-bold">Room Capacity</h3>
+    <form action="" method="post" id="groupform" data-group-url="{% url 'org:capacity'%}" onsubmit="return validateCapacity()">
+        {% csrf_token %}
+        <table align="center" cellpadding="10">
+           <input type="hidden" name="txttotal" id="txttotal" value="{{event.tot_capacity}}">
+            {% for i in room %}
+
+             <tr>
+                <td>Group{{forloop.counter}}</td>
+                <td><select name="selc" class="selc" required>
+                        <option value="">---Select---</option>
+                        <option value="1,{{i.id}}">1</option>
+                        <option value="2,{{i.id}}">2</option>
+                        <option value="3,{{i.id}}">3</option>
+                        <option value="4,{{i.id}}">4</option>
+                        <option value="5,{{i.id}}">5</option>
+                        <option value="6,{{i.id}}">6</option>
+                        <option value="7,{{i.id}}">7</option>
+                        <option value="8,{{i.id}}">8</option>
+                        <option value="9,{{i.id}}">9</option>
+                        <option value="10,{{i.id}}">10</option>
+                        <option value="11,{{i.id}}">11</option>
+                        <option value="12,{{i.id}}">12</option>
+                        <option value="13,{{i.id}}">13</option>
+                        <option value="14,{{i.id}}">14</option>
+                        <option value="15,{{i.id}}">15</option>
+                        <option value="16,{{i.id}}">16</option>
+                        <option value="17,{{i.id}}">17</option>
+                        <option value="18,{{i.id}}">18</option>
+                        <option value="19,{{i.id}}">19</option>
+                        <option value="20,{{i.id}}">20</option>
+                        <option value="21,{{i.id}}">21</option>
+                        <option value="22,{{i.id}}">22</option>
+                        <option value="23,{{i.id}}">23</option>
+                        <option value="24,{{i.id}}">24</option>
+                        <option value="25,{{i.id}}">25</option>
+                </select></td>
+             </tr>  
+             {% endfor %} 
+             <tr>
+                <td colspan="2" align="right"><input type="submit" value="Next" id="submit" name="btn"></td>
+             </tr>
+        </table>
+        {% if mess %}
+        <script>
+            alert("YOU HAVE CREATED THE EVENT PLEASE PROVIDE EVENTNAME TO USER FOR SET THEIR PREFERENCE");
+            window.location="../../Org/home";
+        </script>
+        {% endif %}
+    </form>
+</body>
+</html>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script>
+    $(".selc").change(function () {
+        var did = $(this).val();
+        //alert(did); 
+        var ur = $("#groupform").attr("data-group-url");
+        $.ajax({
+            url: ur,
+            data: { did: did, },
+            success: function (data) {
+               
+            },
+        });
+    });
+
+    function validateCapacity() {
+        var totalCapacity = parseInt(document.getElementById("txttotal").value);
+        var selectedOptions = document.querySelectorAll(".selc");
+        var selectedCapacity = 0;
+
+        // Calculate the sum of selected capacities
+        selectedOptions.forEach(function (option) {
+            var capacity = parseInt(option.value.split(",")[0]);
+            selectedCapacity += capacity;
+        });
+
+        // Check if the selected capacity exceeds the total capacity
+        if (totalCapacity !== null && selectedCapacity > totalCapacity) {
+            alert("Total capacity exceeded. Please adjust the group capacities.");
+            return true; // Allow form submission
+        }
+
+        return true; // Allow form submission
+    }
+</script>
+
+
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}

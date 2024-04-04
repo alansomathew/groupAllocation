@@ -1,0 +1,44 @@
+{% extends 'Organizer/Head.html'%}
+{% load static %}
+
+
+{%  block content %}
+<br><br><br><br>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <table  align="center" cellpadding="10">
+        <tr>
+            {% for i in rdata %}
+            <td>
+                <div style="text-align:center;border:1px solid black;margin:22px;padding:20px">
+                {{i.number}} 
+                {% for j in data %}
+                {% if i.number in j.rooms %}
+
+
+                    <p>{{j.user}}</p>
+
+
+
+
+                {% endif %}
+                {% endfor %}
+            </div>
+            </td>
+            {% if forloop.counter|divisibleby:4 %}
+        </tr>
+        <tr>
+            {% endif %}
+            {% endfor %}
+
+    </table>
+</body>
+</html>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}
