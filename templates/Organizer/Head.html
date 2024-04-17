@@ -37,15 +37,15 @@
     <header class="header-section">
         <div class="container">
             <div class="logo" style="padding-top: 15px !important;">
-                <a href="{% url 'Guest:home'%}">
+                <a href="{% url 'home' %}">
                     <img src="{% static 'img.png' %}" alt="" width="150" height="150">
                 </a>
             </div>
             <div class="nav-menu" style="padding-top:36px ;">
                 <nav class="mainmenu mobile-menu">
                     <ul>
-                        <li class="active"><a href="{% url 'org:home'%}">Home</a></li>
-                        <!-- <li><a href="{% url 'Guest:login' %}">Orgaziner</a></li> -->
+                        <li class="active"><a href="{% url 'index' %}">Home</a></li>
+                        <!-- <li><a href="{% url 'login' %}">Orgaziner</a></li> -->
                         <!-- <li><a href="./speaker.html">Participe</a>
                             <ul class="dropdown">
                                 <li><a href="#">Jayden</a></li>
@@ -59,7 +59,7 @@
                         <li><a href="./contact.html">Contacts</a></li> -->
                     </ul>
                 </nav>
-                <a href="{% url 'org:logout' %}" class="primary-btn top-btn">Logout</a>
+                <a href="{% url 'logout' %}" class="primary-btn top-btn">Logout</a>
             </div>
             <div id="mobile-menu-wrap"></div>
         </div>
