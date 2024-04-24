@@ -9,8 +9,8 @@
         <table align="center" cellpadding="10">
             <tr>
                 <td colspan="4" align="center">
-                    <a href=""><img src="{% static 'Img/add.png'%}">
-                    <p>Create event</p>
+                    <a href="{% url 'events' %}"><img src="{% static 'Img/add.png'%}">
+                    <p>Create Activity</p>
                 </a>
                 </td>
 
@@ -19,10 +19,11 @@
             {% for i in data %}
               
             <td>
-              <a href="" style="text-decoration: none;">
+              <a href="{% url 'event_details' i.id %}" style="text-decoration: none;">
                 <div style="text-align:center;border:1px solid black;margin:22px;padding:20px">
 
-                    <p>{{i.code}}</p>
+                    <p>code :{{i.code}}</p>
+                    <p>{{i.name}}</p>
                   
                 </div></a>
             </td>

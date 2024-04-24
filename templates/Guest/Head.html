@@ -25,6 +25,8 @@
     <link rel="stylesheet" href="{% static 'Main/css/slicknav.min.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'Main/css/style.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'Form/form.css' %}" />
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/dataTables.bootstrap4.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
 <body>
@@ -38,7 +40,7 @@
         <div class="container">
             <div class="logo" style="padding-top: 15px !important;">
                 <a href="{% url 'home'%}">
-                    <img src="{% static 'img.png' %}" alt="" width="150" height="150">
+                    <h2>GroupGo:</h2> <span class="small text-black">Effortless Activity Picker</span>
                 </a>
             </div>
             <div class="nav-menu" style="padding-top: 36px;">
@@ -46,20 +48,10 @@
                     <ul>
                         <li class="active"><a href="{% url 'home'%}">Home</a></li>
                         <li><a href="{% url 'login' %}">Orgaziner</a></li>
-                        <!-- <li><a href="./speaker.html">Participe</a>
-                            <ul class="dropdown">
-                                <li><a href="#">Jayden</a></li>
-                                <li><a href="#">Sara</a></li>
-                                <li><a href="#">Emma</a></li>
-                                <li><a href="#">Harriet</a></li>
-                            </ul>
-                        </li>
-                        <li><a href="./schedule.html">Schedule</a></li>
-                        <li><a href="./blog.html">Blog</a></li>
-                        <li><a href="./contact.html">Contacts</a></li> -->
+
                     </ul>
                 </nav>
-               
+                <a href="" class="primary-btn top-btn"><i class="fa fa-ticket"></i> Participate</a>
             </div>
             <div id="mobile-menu-wrap"></div>
         </div>
@@ -69,15 +61,39 @@
     {% block content %}
 
     {% endblock content %}
-
+    <script
+        src="https://cdn.datatables.net/v/bs5/jq-3.6.0/dt-1.13.4/b-2.3.6/b-colvis-2.3.6/b-html5-2.3.6/sb-1.4.2/sp-2.1.2/datatables.min.js"></script>
     <script>
         // Automatically close the notification after 5 seconds
-        setTimeout(function() {
-          var notification = document.querySelector('.alert');
-          notification.style.display = 'none';
+        setTimeout(function () {
+            var notification = document.querySelector('.alert');
+            notification.style.display = 'none';
         }, 3000);
-      </script>
-    
+
+
+
+        $(document).ready(function () {
+            // Initialize datatable with search functionality, pagination, and icons
+            // Initialize DataTable for tables with IDs like "myTable1", "myTable2", etc.
+            $('table[id^="myTable"]').DataTable({
+                searching: true,
+                ordering: true,
+                paging: true,
+                pageLength: 10,
+                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                    '<"row"<"col-sm-12"tr>>' +
+                    '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+                language: {
+                    paginate: {
+                        previous: '<i class="fas fa-chevron-left"></i>',
+                        next: '<i class="fas fa-chevron-right"></i>'
+                    }
+                }
+            });
+        });
+    </script>
+
+
     <!-- Js Plugins -->
     <script src="{% static 'Main/js/jquery-3.3.1.min.js' %}"></script>
     <script src="{% static 'Main/js/bootstrap.min.js' %}"></script>

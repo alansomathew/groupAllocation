@@ -2,6 +2,8 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib import messages
+from django.urls import reverse
+from AllocationAdmin.models import Event, Participant, ParticipantActivity
 
 
 # Create your views here.
@@ -67,3 +69,36 @@ def signup(request):
 
 def home(request):
     return render(request, 'Guest/Home.html')
+
+def create_participant(request):
+    if request.method == 'POST':
+        # Extract data from POST request
+        
+        participant_name = request.POST.get('txtn')
+        participant_email = request.POST.get('email')
+
+        # Create and save Participant instance
+        participant = Participant(
+           
+            name=participant_name,
+            email=participant_email,
+        )
+        participant.save()
+        return redirect('choose_activity',id=participant.id)
+
+    return render(request, 'Guest/Event.html')
+
+def choose_activity(request,id):
+    participantObj=Participant.objects.get(id=id)
+    data = Event.objects.filter(is_active=True)
+    if request.method == 'POST':
+        selected_activities = request.POST.getlist('activities')
+        
+        # Iterate over selected activities and save them for the participant
+        for activity_id in selected_activities:
+            activity = Event.objects.get(pk=activity_id)
+            ParticipantActivity.objects.create(participant=participantObj, activity=activity)
+            
+        return redirect('home')
+    else:
+        return render(request, 'Guest/activity.html', {'data': data, 'participant':participantObj})

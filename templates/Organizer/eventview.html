@@ -16,46 +16,34 @@
         {% csrf_token %}
         <table border="1" align="center" cellpadding="10">
             <tr>
-                <th>Event Code</th>
-                <th>Rooms Alloted</th>
+                <th>Activity Code</th>
+                <th>Name</th>
+                <th>Minimum Participants</th>
+                <th>Maximum Participants</th>
+                <th>Remarks</th>
+                
                 <th>Action</th>
             </tr>
             <tr>
                 <td>{{data.code}}</td>
-                <td>{{data.rooms}}</td>
+                <td>{{data.name}}</td>
+                <td>{{data.min_participants}}</td>
+                <td>{{data.max_participants}}</td>
+                <td>{{data.description}}</td>
                 <td>
-                    {% if data.status == 1 %}
-                    <a href="{% url 'org:status' data.id %}">Status</a> |
-                    {% if data.is_private %}
-                    <a href="{% url 'org:view_code' data.id %}">Viewcode</a> |
-                    {% endif %}
-                    <a href="{% url 'org:result' data.id %}">Result</a> |
-                    <a href="{% url 'org:manuualy' data.id %}">Edit Result</a> |
-                    <a href="{% url 'org:reopen' data.id %}">Re Open Event</a> |
-                    <a href="{% url 'org:deleteevent' data.id %}">Delete Event</a>
-                    {% else %}
-                    <p>
-                        <a href="{% url 'org:editevent' data.id %}">Edit EventCode</a> |
-                        {% if data.is_private %}
-                        <a href="{% url 'org:view_code' data.id %}">Viewcode</a> |
-                        <a href="{% url 'org:add_capacity' data.id %}">Add Event Capacity</a> |
-                        {% endif %}
-                        <a href="{% url 'org:change_capacity' data.id %}">Change Group Capacity</a> |
-                        <a href="{% url 'org:status' data.id %}">Status</a> |
-                        <a href="{% url 'org:result' data.id %}">Result</a> |
-                        <a href="{% url 'org:manuualy' data.id %}">Edit Result</a> |
-                        <a href="{% url 'org:finishevent' data.id %}">Finish</a>
-                      
-                    </p>
-
-                    {% endif %}
+                    
+                    <a href="{% url 'list_participants' data.id %}">List Participants</a> |
+                    <a href="{% url 'event_edit' data.id %}">Modify</a> |
+                    <a href="">next</a> |
+                    <a href="">Save</a>
+                 
                 </td>
             </tr>
         </table>
     </form>
     {% if mess == 1 %}
     <script>
-        alert("This Event is finished you can view the results");
+        alert("This Activity is finished you can view the results");
         window.location = "../../eventview/{{data.id}}";
     </script>
 
