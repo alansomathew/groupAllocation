@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 # Create your models here.
 class Event(models.Model):
     name=models.CharField(max_length=50)
-    description=models.TextField()
+    description=models.TextField(null=True,blank=True)
     min_participants=models.IntegerField()
     max_participants=models.IntegerField()
     code=models.CharField(max_length=50,unique=True)
