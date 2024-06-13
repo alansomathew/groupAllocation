@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from AllocationAdmin.models import Event, ParticipantActivity, Participant
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
-from gurobipy import Model, GRB
+from gurobipy import Model, GRB, quicksum
 from django.contrib.auth.decorators import login_required
 
 
@@ -137,19 +137,19 @@ def allocate_all_events(request):
 
     # Set objective
     model.setObjective(
-        gp.quicksum(x[i, j] for i in range(n) for j in range(a)), GRB.MAXIMIZE
+        quicksum(x[i, j] for i in range(n) for j in range(a)), GRB.MAXIMIZE
     )
 
     # Constraints
     for i in range(n):
-        model.addConstr(gp.quicksum(x[i, j] for j in range(a)) == 1)
+        model.addConstr(quicksum(x[i, j] for j in range(a)) == 1)
 
     for j in range(a):
         model.addConstr(
-            gp.quicksum(x[i, j] for i in range(n)) <= y[j] * upper_bounds[j]
+            quicksum(x[i, j] for i in range(n)) <= y[j] * upper_bounds[j]
         )
         model.addConstr(
-            gp.quicksum(x[i, j] for i in range(n)) >= y[j] * lower_bounds[j]
+            quicksum(x[i, j] for i in range(n)) >= y[j] * lower_bounds[j]
         )
 
     for i in range(n):
