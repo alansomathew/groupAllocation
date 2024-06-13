@@ -7,3 +7,14 @@
 # venv
 env
 venv
+
+AllocationAdmin/__pycache__
+AllocationAdmin/__pycache__/
+AllocationAdmin/migrations
+AllocationAdmin/migrations/
+groupAllocation/__pycache__
+groupAllocation/__pycache__/
+user/__pycache__
+user/__pycache__/
+user/migrations
+user/migrations/
