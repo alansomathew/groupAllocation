@@ -6,25 +6,41 @@
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <title>Allocation Result</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Participant Allocation</title>
 </head>
+
 <body>
-    <h1>Allocation Result</h1>
-    <p>{{ message }}</p>
-    {% if allocations %}
-        <h2>Allocated Participants</h2>
-        {% for allocation in allocations %}
-            <h3>Event: {{ allocation.event.name }}</h3>
-            <ul>
-                {% for participant in allocation.participants %}
-                    <li>{{ participant.name }} ({{ participant.email }})</li>
+    <div class="container">
+        <h1>Allocation for Event: {{ event.name }}</h1>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Participant Name</th>
+                    <th>Assigned Activity</th>
+                    <th>Preferences</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for participant in participant_data %}
+                <tr>
+                    <td>{{ participant.name }}</td>
+                    <td>{{ participant.assigned_to }}</td>
+                    <td>{{ participant.preferences }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3">No participants have been allocated yet.</td>
+                </tr>
                 {% endfor %}
-            </ul>
-        {% endfor %}
-    {% endif %}
+            </tbody>
+        </table>
+    </div>
 </body>
+
 </html>
 
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>

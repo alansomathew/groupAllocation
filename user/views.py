@@ -88,17 +88,31 @@ def create_participant(request):
 
     return render(request, 'Guest/Event.html')
 
-def choose_activity(request,id):
-    participantObj=Participant.objects.get(id=id)
-    data = Event.objects.filter(is_active=True)
+def choose_activity(request, id):
+    participant = Participant.objects.get(id=id)
+    events = Event.objects.filter(is_active=True)
+
     if request.method == 'POST':
-        selected_activities = request.POST.getlist('activities')
-        
-        # Iterate over selected activities and save them for the participant
-        for activity_id in selected_activities:
-            activity = Event.objects.get(pk=activity_id)
-            ParticipantActivity.objects.create(participant=participantObj, activity=activity)
-            
-        return redirect('home')
+        for event in events:
+            preference_key = f'preference_{event.id}'
+            if preference_key in request.POST:
+                # Parse the preference list from the input string
+                preference_input = request.POST[preference_key].strip()
+                if preference_input:
+                    preferences = list(map(int, preference_input.split(',')))
+                else:
+                    preferences = [0]
+            else:
+                preferences = [0]  # Default preference if not provided
+
+            ParticipantActivity.objects.update_or_create(
+                participant=participant,
+                event=event,
+                defaults={'preferences': preferences}
+            )
+
+        # Redirect or show success message
+        messages.success(request,'You have changed your interest. Wait for results updates.')
+        return render(request, 'Guest/activity.html', {'data': events})
     else:
-        return render(request, 'Guest/activity.html', {'data': data, 'participant':participantObj})
+        return render(request, 'Guest/activity.html', {'data': events})

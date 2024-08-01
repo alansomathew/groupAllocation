@@ -34,6 +34,8 @@
                     
                     <a href="{% url 'list_participants' data.id %}">List Participants</a> |
                     <a href="{% url 'event_edit' data.id %}">Modify</a> |
+
+                    <a href="{% url 'view_allocation' data.id %}">View Allocation</a>
                     <a href="">next</a> |
                     <a href="">Save</a>
                  
@@ -41,6 +43,11 @@
             </tr>
         </table>
     </form>
+
+    <div class="col-md-12">
+       
+
+    </div>
     {% if mess == 1 %}
     <script>
         alert("This Activity is finished you can view the results");

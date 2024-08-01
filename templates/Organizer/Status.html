@@ -2,43 +2,45 @@
 {% load static %}
 
 
-{%  block content %}
+{% block content %}
 <br><br><br><br>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Participant List for {{ event.name }}</title>
 </head>
+
 <body>
     <div class="container">
+        <h1>Participants for {{ event.name }}</h1>
         <table id="myTable" class="table table-striped" style="width:100%">
             <thead>
                 <tr>
                     <th>#</th>
                     <th>Name</th>
                     <th>Email</th>
-                    
-                    <th>Action</th>
+
+                    <th>Preference</th>
                 </tr>
             </thead>
             <tbody>
-                {% for user in data %}
+                {% for participant_activity in participant_activities %}
                 <tr>
                     <td>{{forloop.counter}}</td>
-                    <td>{{user.participant.user}}</td>
-                    <td>{{user.participant.email}}</td>
-                    
-                    <td>
-                        
-                    </td>
+                    <td>{{ participant_activity.participant.name }}</td>
+                    <td>{{ participant_activity.participant.email }}</td>
+                    <td>{{ participant_activity.preferences|safe }}</td>
                 </tr>
                 {% endfor %}
+            </tbody>
 
-            </table>
+        </table>
     </div>
 </body>
+
 </html>
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 {% endblock content %}

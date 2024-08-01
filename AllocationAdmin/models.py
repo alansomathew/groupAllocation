@@ -19,7 +19,10 @@ class Participant(models.Model):
     is_active=models.BooleanField(default=True)
     created_on=models.DateTimeField(auto_now_add=True)
     updated_on=models.DateTimeField(auto_now=True)
+    assigned_to=models.ForeignKey(Event,on_delete=models.CASCADE,null=True)
+
 
 class ParticipantActivity(models.Model):
     participant = models.ForeignKey(Participant, on_delete=models.CASCADE)
-    activity = models.ForeignKey(Event, on_delete=models.CASCADE)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE)
+    preferences = models.TextField()  # Or use JSONField for JSON string
