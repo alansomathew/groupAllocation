@@ -1,0 +1,52 @@
+{% extends 'Organizer/Head.html' %}
+
+{% block content %}
+<br><br><br><br>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Participant Allocation</title>
+</head>
+<body>
+    <div class="container">
+     
+        <h1>Allocation Results</h1>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Participant Name</th>
+                    <th>Assigned Event</th>
+                    <th>Preferences</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for participant in participants %}
+                <tr>
+                    <td>{{ participant.name }}</td>
+                    <td>
+                        {% if participant.assigned_to_new %}
+                            {{ participant.assigned_to_new.name }}
+                        {% else %}
+                            None
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% for pa in participant.participantactivity_set.all %}
+                            Event: {{ pa.event.name }}, Preference: {{ pa.preferences }}<br>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3">No participants have been allocated yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}

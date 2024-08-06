@@ -19,7 +19,8 @@ class Participant(models.Model):
     is_active=models.BooleanField(default=True)
     created_on=models.DateTimeField(auto_now_add=True)
     updated_on=models.DateTimeField(auto_now=True)
-    assigned_to=models.ForeignKey(Event,on_delete=models.CASCADE,null=True)
+    assigned_to=models.ForeignKey(Event,on_delete=models.CASCADE,null=True,related_name="OLD_ALLOCATION")
+    assigned_to_new=models.ForeignKey(Event,on_delete=models.CASCADE,null=True,related_name='NEW_ALLOCATION')
 
 
 class ParticipantActivity(models.Model):

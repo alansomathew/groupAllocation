@@ -268,3 +268,93 @@ def view_allocation(request):
     participants = Participant.objects.all()
     return render(request, 'Organizer/allocation.html', {'participants': participants})
 
+def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences):
+    # Create the LP model
+    model = LpProblem("ActivityAssignment", LpMaximize)
+
+    # Decision variables
+    x = LpVariable.dicts("x", ((i, j) for i in range(n) for j in range(a)), cat=LpBinary)
+    y = LpVariable.dicts("y", (j for j in range(a)), cat=LpBinary)
+
+    # Normalize preferences: only consider non-negative preferences
+    normalized_preferences = [[max(0, min(1, Preferences[i][j])) for j in range(a)] for i in range(n)]
+
+    # Objective function: maximize total preference score
+    model += lpSum(normalized_preferences[i][j] * x[i, j] for i in range(n) for j in range(a))
+
+    # Constraints
+
+    # Each participant can be assigned to at most one activity
+    for i in range(n):
+        model += lpSum(x[i, j] for j in range(a)) <= 1, f"Participant_{i}_Assignment"
+
+    # Ensure each activity j has the correct number of participants assigned within bounds
+    for j in range(a):
+        model += min_bounds[j] * y[j] <= lpSum(x[i, j] for i in range(n)), f"Min_Participants_Activity_{j}"
+        model += lpSum(x[i, j] for i in range(n)) <= max_bounds[j] * y[j], f"Max_Participants_Activity_{j}"
+
+    # Ensure correct values for assigned activities
+    for j in range(a):
+        model += lpSum(x[i, j] for i in range(n)) >= y[j], f"Activity_{j}_Activation"
+
+    # Do not assign participants to activities with negative preferences
+    for i in range(n):
+        for j in range(a):
+            if Preferences[i][j] < 0:
+                model += x[i, j] == 0, f"Negative_Preference_{i}_{j}"
+
+    # Solve the model
+    model.solve()
+
+    # Output results
+    assignments = []
+    for i in range(n):
+        for j in range(a):
+            if x[i, j].varValue > 0.5:  # Because variables are binary, this checks if they are 1
+                assignments.append((i+1, j+1))
+
+    assigned_activities = [j+1 for j in range(a) if y[j].varValue > 0.5]
+
+    return assignments, assigned_activities
+
+def allocate_participants_new(request):
+    user = request.user
+    events = Event.objects.filter(created_by=user, is_active=True)
+    participants = Participant.objects.filter(is_active=True)
+    
+    n = participants.count()
+    a = events.count()
+    
+    min_bounds = [event.min_participants for event in events]
+    max_bounds = [event.max_participants for event in events]
+    
+    preferences = []
+    for participant in participants:
+        prefs = []
+        for event in events:
+            try:
+                pa = ParticipantActivity.objects.get(participant=participant, event=event)
+                # Convert the preferences string to a list of integers
+                pref_list = ast.literal_eval(pa.preferences)
+                prefs.extend(pref_list)  # Use extend to add the entire list
+            except ParticipantActivity.DoesNotExist:
+                prefs.extend([0] * a)  # Assuming neutral preference for missing entries
+        preferences.append(prefs)
+    
+    # Choose the algorithm based on a request parameter
+    
+    assignments, assigned_activities = solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, preferences)
+   
+    
+    for participant_id, event_id in assignments:
+        participant = participants[participant_id - 1]  # Adjust index for zero-based indexing
+        event = events[event_id - 1]
+        participant.assigned_to_new = event
+        participant.save()
+    
+    messages.success(request, "Allocation completed successfully!")
+    return redirect('view_allocation_new')
+
+def view_allocation_new(request):
+    participants = Participant.objects.all()
+    return render(request, 'Organizer/new_allocation.html', {'participants': participants})
