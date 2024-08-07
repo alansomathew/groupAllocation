@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -72,47 +72,46 @@ def home(request):
 
 def create_participant(request):
     if request.method == 'POST':
-        # Extract data from POST request
-        
         participant_name = request.POST.get('txtn')
         participant_email = request.POST.get('email')
 
-        # Create and save Participant instance
-        participant = Participant(
-           
-            name=participant_name,
+        # Check if participant already exists
+        participant, created = Participant.objects.get_or_create(
             email=participant_email,
+            defaults={'name': participant_name}
         )
-        participant.save()
-        return redirect('choose_activity',id=participant.id)
+
+        if not created:
+            # Update participant's name if they already exist
+            participant.name = participant_name
+            participant.save()
+
+        return redirect('choose_activity', id=participant.id)
 
     return render(request, 'Guest/Event.html')
 
 def choose_activity(request, id):
-    participant = Participant.objects.get(id=id)
+    participant = get_object_or_404(Participant, id=id)
     events = Event.objects.filter(is_active=True)
-
+    
     if request.method == 'POST':
         for event in events:
             preference_key = f'preference_{event.id}'
-            if preference_key in request.POST:
-                # Parse the preference list from the input string
-                preference_input = request.POST[preference_key].strip()
-                if preference_input:
-                    preferences = list(map(int, preference_input.split(',')))
-                else:
-                    preferences = [0]
-            else:
-                preferences = [0]  # Default preference if not provided
+            preference_value = request.POST.get(preference_key)
+            if preference_value is not None:
+                preference_value = int(preference_value)
+                # Save or update the preference for each event
+                ParticipantActivity.objects.update_or_create(
+                    participant=participant,
+                    event=event,
+                    defaults={'preference': preference_value}
+                )
 
-            ParticipantActivity.objects.update_or_create(
-                participant=participant,
-                event=event,
-                defaults={'preferences': preferences}
-            )
+        messages.success(request, 'You have changed your interest. Wait for results updates.')
+        return redirect('home')
 
-        # Redirect or show success message
-        messages.success(request,'You have changed your interest. Wait for results updates.')
-        return render(request, 'Guest/activity.html', {'data': events})
-    else:
-        return render(request, 'Guest/activity.html', {'data': events})
+    # Retrieve existing preferences
+    preferences = ParticipantActivity.objects.filter(participant=participant).values('event_id', 'preference')
+    preferences_dict = {pref['event_id']: pref['preference'] for pref in preferences}
+
+    return render(request, 'Guest/activity.html', {'data': events, 'participant': participant, 'preferences': preferences_dict})

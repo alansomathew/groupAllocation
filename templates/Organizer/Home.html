@@ -42,16 +42,31 @@
     </form>
     <div class="container">
         <div class="row">
-            <div class="col-md-12 justify-content-center d-flex">
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'allocate_participants' %}">Allocate Participants</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">View Allocation</a> |
+            <div class="col-md-12 justify-content-center d-flex mt-5">
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'allocate_participants' %}">Compute Allocation</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check Allocation</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation' %}">Modify Allocation</a> 
 
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'allocate_participants_new' %}">New Allocate Participants</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">View New Allocation</a> 
+               
             
+            </div>
+            <div class="col-md-12 justify-content-center d-flex mt-5">
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'allocate_participants_new' %}">Compute Allocation</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check Allocation</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_new' %}">Modify Allocation</a> 
             </div>
         </div>
     </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert  {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
+        data-timeout="3000" role="alert">
+        {{message}}
+        <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
 </body>
 </html>
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>

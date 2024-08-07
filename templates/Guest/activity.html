@@ -1,65 +1,85 @@
 {% extends 'Guest/Head.html'%}
 {% load static %}
+{% load custom_tags %}
 {% block content %}
 <br><br><br><br>
 
-    <div class="container">
-        <form action="" method="post">
-            {% csrf_token %}
-            <table id="myTable" class="table table-striped" style="width:100%">
-                <thead>
-                    <tr>
-                        <th>Activity Code</th>
-                        <th>Name</th>
-                        <th>Organizer</th>
-                        <th>Remarks</th>
-                        <th>Preferences</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for i in data %}
-                    <tr>
-                        <td>{{ i.code }}</td>
-                        <td>{{ i.name }}</td>
-                        <td>{{ i.created_by.first_name }} {{ i.created_by.last_name }}</td>
-                        <td>
-                            {% if i.description %}
-                            {{ i.description|linebreaks }}
-                            {% else %}
-                            <p>No Remarks</p>
-                            {% endif %}
-                        </td>
-                        
-                        <td>
-                            <input type="text" name="preference_{{ i.id }}" placeholder="e.g., -2,4" class="form-control">
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    <tr>
-                        <td colspan="6" align="right"><input type="submit" value="Next" name="btn"></td>
-                    </tr>
-                </tbody>
-            </table>
-            {% if mess == 1 %}
-            <script>
-                alert("This Event is Already Finished. Try Any Other Events.");
-                window.location = "";
-            </script>
-            {% endif %}
-            {% if messages %}
-            {% for message in messages %}
-            <div class="alert {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
-                data-timeout="3000" role="alert">
-                {{ message }}
-                <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            {% endfor %}
-            {% endif %}
-        </form>
-        
-    </div>
-    <script>
-    </script>
+<style>
+    /* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+</style>
+
+<div class="container">
+    <form action="" method="post">
+        {% csrf_token %}
+        <table id="myTable" class="table table-striped" style="width:100%">
+            <thead>
+                <tr>
+                    <th>Activity Code</th>
+                    <th>Name</th>
+                    <th>Organizer</th>
+                    <th>Remarks</th>
+                    <th>Preferences</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in data %}
+                <tr>
+                    <td>{{ event.code }}</td>
+                    <td>{{ event.name }}</td>
+                    <td>{{ event.created_by.first_name }} {{ event.created_by.last_name }}</td>
+                    <td>
+                        {% if event.description %}
+                        {{ event.description|linebreaks }}
+                        {% else %}
+                        <p>No Remarks</p>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <input type="number" name="preference_{{ event.id }}"
+                            placeholder="Enter your preference (negative values allowed)"
+                            value="{{ preferences|get_item:event.id }}">
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr>
+                    <td colspan="6" align="right"><input type="submit" value="Next" name="btn"></td>
+                </tr>
+            </tbody>
+        </table>
+        {% if mess == 1 %}
+        <script>
+            alert("This Event is Already Finished. Try Any Other Events.");
+            window.location = "";
+        </script>
+        {% endif %}
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
+            data-timeout="3000" role="alert">
+            {{ message }}
+            <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </form>
+</div>
+
+
 
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 {% endblock content %}

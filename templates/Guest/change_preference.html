@@ -20,7 +20,9 @@
             <tr>
                 <td>{{ event.name }} Interested</td>
                 <td>
-                    <input type="text" name="preference_{{ event.id }}" placeholder="e.g., -2,4">
+                    <input type="text" name="preference_{{ event.id }}"
+                        placeholder="Enter your preference (negative values allowed)"
+                        value="{% if event.id in preferences %}{{ preferences[event.id] }}{% endif %}">
                 </td>
             </tr>
             {% endfor %}
@@ -28,32 +30,18 @@
                 <td colspan="2" align="right"><input type="submit" value="Submit" name="btn"></td>
             </tr>
         </table>
-        {% if mess %}
-        <script>
-            alert("{{ mess }}");
-            window.location = "";
-        </script>
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert  {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
+            data-timeout="3000" role="alert">
+            {{message}}
+            <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
         {% endif %}
     </form>
 </body>
 
 </html>
-<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-<script>
-    $(".selc").change(function () {
-        var did = $(this).val();
-        var cid=$(this).attr('alt');
-        //alert(did); 
-        var ur = $("#groupform").attr("data-group-url");
-        $.ajax({
-            url: ur,
-            data: { did: did,cid:cid },
-            success: function (data) {
-               
-            },
-        });
-       
-    }); -->
-</script>
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 {% endblock content %}

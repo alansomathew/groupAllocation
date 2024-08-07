@@ -32,12 +32,22 @@
                     <td>{{forloop.counter}}</td>
                     <td>{{ participant_activity.participant.name }}</td>
                     <td>{{ participant_activity.participant.email }}</td>
-                    <td>{{ participant_activity.preferences|safe }}</td>
+                    <td>{{ participant_activity.preference|safe }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
 
         </table>
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert  {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
+            data-timeout="3000" role="alert">
+            {{message}}
+            <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
     </div>
 </body>
 

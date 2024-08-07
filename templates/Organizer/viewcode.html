@@ -13,50 +13,59 @@
 
 <body>
 
-    
- <div class="" id="print-section">
-    <form action="" method="post">
-        {% csrf_token %}
 
-        <div class="col-md-12 text-center">
-            <span>Event Code: {{event.code}} </span>
-            <span>Total capacity: {{event.tot_capacity}}</span>
+    <div class="" id="print-section">
+        <form action="" method="post">
+            {% csrf_token %}
+
+            <div class="col-md-12 text-center">
+                <span>Event Code: {{event.code}} </span>
+                <span>Total capacity: {{event.tot_capacity}}</span>
+            </div>
+            <table border="1" align="center" cellpadding="10">
+                <tr>
+                    <th>#</th>
+                    <th>Code</th>
+                </tr>
+                {% for i in data %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ i.code }}</td>
+
+                </tr>
+                {% endfor %}
+            </table>
+        </form>
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert  {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
+            data-timeout="3000" role="alert">
+            {{message}}
+            <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-        <table border="1" align="center" cellpadding="10">
-            <tr>
-                <th>#</th>
-                <th>Code</th>
-            </tr>
-            {% for i in data %}
-            <tr>
-                <td>{{ forloop.counter }}</td>
-                <td>{{ i.code }}</td>
-                
-            </tr>
-            {% endfor %}
-        </table>
-    </form>
- </div>
+        {% endfor %}
+        {% endif %}
+    </div>
     <div class="col-md-12 float-end">
         <button class="d-flex btn btn-danger float-end " onclick="printSection('print-section')">
             Print
         </button>
     </div>
-    
+
     <script>
-      function printSection(sectionId) {
-    var printContent = document.getElementById(sectionId).innerHTML;
-    var originalContent = document.body.innerHTML;
+        function printSection(sectionId) {
+            var printContent = document.getElementById(sectionId).innerHTML;
+            var originalContent = document.body.innerHTML;
 
-    document.body.innerHTML = printContent;
+            document.body.innerHTML = printContent;
 
-    window.print();
+            window.print();
 
-    document.body.innerHTML = originalContent;
-}
+            document.body.innerHTML = originalContent;
+        }
 
     </script>
-    
+
 </body>
 
 </html>

@@ -25,12 +25,15 @@
                 <td colspan="2" align="right"><input type="submit" value="Submit" name="btn"></td>
             </tr>
         </table>
-        {% if mess %}
-        <script>
-            alert("You have Provieded your Interest Wait For Results Updates");
-            window.location="";
-        </script>
-        {% endif %}
+        {% if messages %}
+{% for message in messages %}
+<div class="alert  {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
+    data-timeout="3000" role="alert">
+    {{message}}
+    <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endfor %}
+{% endif %}
     </form>
 </body>
 </html>

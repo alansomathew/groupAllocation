@@ -26,4 +26,4 @@ class Participant(models.Model):
 class ParticipantActivity(models.Model):
     participant = models.ForeignKey(Participant, on_delete=models.CASCADE)
     event = models.ForeignKey(Event, on_delete=models.CASCADE)
-    preferences = models.TextField()  # Or use JSONField for JSON string
+    preference = models.IntegerField(default=0)  # Allowing negative, positive, and zero
