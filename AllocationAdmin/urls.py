@@ -15,6 +15,8 @@ urlpatterns = [
     path('allocate-new/', views.allocate_participants_new,name='allocate_participants_new'),
     path('view-allocation-new/', views.view_allocation_new,name='view_allocation_new'),
     path('edit-allocation/', views.edit_allocation, name='edit_allocation'),
-    path('edit-allocation-new/', views.edit_allocation_new, name='edit_allocation_new')
+    path('edit-allocation-new/', views.edit_allocation_new, name='edit_allocation_new'),
+    path('stop-event/<str:event_id>/', views.stop_event, name='stop_event'),
+    path('start-event/<str:event_id>/', views.start_event, name='start_event'),
 
 ]

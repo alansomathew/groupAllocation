@@ -34,6 +34,14 @@
                     
                     <a href="{% url 'list_participants' data.id %}">List Participants</a> |
                     <a href="{% url 'event_edit' data.id %}">Modify</a> |
+                    <a href="{% url 'event_delete' data.id %}">Delete</a> |
+                    {% if data.is_active %}
+                    <a href="{% url 'stop_event' data.id %}">Stop</a>
+                    {% else %}
+                    <a href="{% url 'start_event' data.id %}">Start</a>
+                    {% endif %}
+                   
+                    
 
                     
                  

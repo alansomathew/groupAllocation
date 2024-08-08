@@ -91,6 +91,22 @@ def event_activate(request, id):
     event.save()
     return redirect("index")
 
+# start event and stop event
+def start_event(request, event_id):
+    event = Event.objects.get(id=event_id)
+    event.is_active = True
+    event.save()
+    messages.success(request, 'Event started successfully.')
+    return redirect('event_details', id=event_id)
+
+
+def stop_event(request, event_id):
+    event = Event.objects.get(id=event_id)
+    event.is_active = False
+    event.save()
+    messages.success(request, 'Event stopped successfully.')
+    return redirect('event_details', id=event_id)
+
 
 def list_participants(request, id):
     event = Event.objects.get(id=id)
@@ -403,7 +419,6 @@ def allocate_participants_new(request):
     # Evaluate Individually Rational
     for i, j in assignments:
         if Preferences[i][j] < 0:
-            messages.success(request,"Individually Rational: Not all participants have non-negative preferences.")
             break
     else:
         messages.success(request,"Individually Rational: All participants have non-negative preferences.")
@@ -415,10 +430,8 @@ def allocate_participants_new(request):
             # Check if there's a higher preference activity not assigned
             if all(Preferences[i][j] < Preferences[i][assigned_activity] for j in assignment_dict[i] if j != assigned_activity):
                 messages.success(request,"Individually Stable: The assignment is individually stable.")
-            else:
-                messages.success(request,"Individually Stable: The assignment is not individually stable.")
-        else:
-            messages.success(request,"Individually Stable: Not all participants are assigned.")
+            
+       
 
     # Evaluate Core Stable
     core_stable = True
@@ -431,8 +444,7 @@ def allocate_participants_new(request):
     
     if core_stable:
         messages.success(request,"Core Stable: The assignment is core stable.")
-    else:
-        messages.success(request,"Core Stable: The assignment is not core stable.")
+    
 
 
     return redirect('view_allocation_new')
