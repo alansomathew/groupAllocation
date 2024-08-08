@@ -264,8 +264,9 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
 
 
 def allocate_participants_to_activities(request):
-    participants = Participant.objects.filter(is_active=True)
     events = Event.objects.filter(is_active=True, created_by=request.user)
+    participants = Participant.objects.filter(assigned_to__in=events).select_related('assigned_to')
+
     
     n = participants.count()
     a = events.count()
@@ -382,8 +383,9 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences):
     return assignments, assigned_activities
 
 def allocate_participants_new(request):
-    participants = Participant.objects.filter(is_active=True)
     events = Event.objects.filter(is_active=True, created_by=request.user)
+    participants = Participant.objects.filter(assigned_to_new__in=events).select_related('assigned_to')
+
     
     n = participants.count()
     a = events.count()
