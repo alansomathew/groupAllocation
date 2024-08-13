@@ -46,6 +46,18 @@ def user_logout(request):
     return redirect('home')
 
 
+def view_organiser(request):
+    try:
+        # Get distinct users who have created events
+        organisers = User.objects.filter(event__isnull=False).distinct()
+
+        # Render the result to the template
+        return render(request, 'Guest/view_organiser.html',{"data":organisers})
+    except Exception as e:
+        print(e)
+        messages.error(request, 'Error viewing data!')
+        return render(request, 'Guest/view_organiser.html')
+
 def signup(request):
     try:
         if request.method == 'POST':
@@ -86,22 +98,26 @@ def create_participant(request):
             participant.name = participant_name
             participant.save()
 
-        return redirect('choose_activity', id=participant.id)
+        request.session['participant'] = participant.id
+
+        return redirect('view_organiser')
 
     return render(request, 'Guest/Event.html')
 
 def choose_activity(request, id):
-    participant = get_object_or_404(Participant, id=id)
-    events = Event.objects.filter(is_active=True)
+    par=request.session['participant']
+    participant = get_object_or_404(Participant, id=par)
+    user=User.objects.get(id=id)
+    events = Event.objects.filter(is_active=True,created_by=user)
     
     if request.method == 'POST':
         for event in events:
             preference_key = f'preference_{event.id}'
             preference_value = request.POST.get(preference_key)
-            if preference_value is not None:
-                preference_value = int(preference_value)
-                # Save or update the preference for each event
-                ParticipantActivity.objects.update_or_create(
+            # Set default value to 0 if preference_value is None
+            preference_value = int(preference_value) if preference_value is not None else 0
+            # Save or update the preference for each event
+            ParticipantActivity.objects.update_or_create(
                     participant=participant,
                     event=event,
                     defaults={'preference': preference_value}

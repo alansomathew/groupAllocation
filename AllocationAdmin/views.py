@@ -10,7 +10,7 @@ import ast
 
 # Create your views here.
 def index(request):
-    data = Event.objects.filter(created_by=request.user, is_active=True).order_by(
+    data = Event.objects.filter(created_by=request.user,).order_by(
         "-created_on"
     )
     return render(request, "Organizer/Home.html", {"data": data})
@@ -265,7 +265,7 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
 
 def allocate_participants_to_activities(request):
     events = Event.objects.filter(is_active=True, created_by=request.user)
-     # Filter participants who have given preferences to the selected events
+  # Filter participants who have given preferences to the selected events created by the current user
     participants = Participant.objects.filter(
         participantactivity__event__in=events
     ).distinct()
@@ -296,46 +296,86 @@ def allocate_participants_to_activities(request):
             participant.assigned_to = event
             participant.save()
     
-    # Check conditions
-    for i, j in assignments:
-        if Preferences[i][j] < 0:
-            messages.success(request,"Individually Rational: Not all participants have non-negative preferences.")
-            break
-    else:
-        messages.success(request,"Individually Rational: All participants have non-negative preferences.")
-
-    # Evaluate Individually Stable
-    for i, j in assignments:
-        participant_preferences = Preferences[i]
-        assigned_activity = j
-        for k in range(len(participant_preferences)):
-            if participant_preferences[k] == assigned_activity:
-                continue
-            if participant_preferences[k] < participant_preferences[assigned_activity]:
-                if k not in [x[1] for x in assignments if x[0] == i]:
-                    messages.success(request,"Individually Stable: The assignment is not individually stable.")
-                    break
-        else:
-            messages.success(request,"Individually Stable: The assignment is individually stable.")
-            continue
-        break
-
-    # Evaluate Core Stable
-    # For simplicity, we are assuming core stability is equivalent to each participant being in their highest preference
-    for i in range(len(Preferences)):
-        highest_preference = Preferences[i].index(max(Preferences[i]))
-        if highest_preference not in [x[1] for x in assignments if x[0] == i]:
-            messages.success(request,"Core Stable: The assignment is not core stable.")
-            break
-    else:
-        messages.success(request,"Core Stable: The assignment is core stable.")
-    
     return redirect('view_allocation')
 
 
+@login_required
 def view_allocation(request):
-    participants = Participant.objects.all()
-    return render(request, 'Organizer/allocation.html', {'participants': participants})
+    try:
+        # Get the events created by the current user (organizer)
+        events = Event.objects.filter(created_by=request.user)
+
+        # Filter participants who have given preferences to any of these events
+        participants = Participant.objects.filter(
+            participantactivity__event__in=events
+        ).distinct()
+
+        # Prepare the list of events for indexing
+        events_list = list(events)
+
+        # Prepare the Preferences matrix and assignment dictionary
+        Preferences = []
+        assignment_dict = {}
+        for idx, participant in enumerate(participants):
+            preferences = []
+            assigned_event = participant.assigned_to  # Assuming 'assigned_to' holds the current assignment
+            assigned_event_idx = events_list.index(assigned_event) if assigned_event in events_list else None
+            if assigned_event_idx is not None:
+                assignment_dict[idx] = assigned_event_idx
+
+            for event in events_list:
+                activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
+                preferences.append(activity_preference.preference if activity_preference else 0)
+            Preferences.append(preferences)
+
+        # Check if the allocation is individually rational
+        individually_rational = True
+        for participant_idx, event_idx in assignment_dict.items():
+            if Preferences[participant_idx][event_idx] < 0:
+                individually_rational = False
+                break
+
+        if individually_rational:
+            messages.success(request, "Individually Rational: All participants have non-negative preferences for their assigned events.")
+        else:
+            messages.error(request, "Individually Rational: Some participants have negative preferences for their assigned events.")
+
+        # Check if the allocation is individually stable
+        individually_stable = True
+        for participant_idx, assigned_event_idx in assignment_dict.items():
+            participant_preferences = Preferences[participant_idx]
+            for event_idx, preference in enumerate(participant_preferences):
+                if event_idx != assigned_event_idx and preference > participant_preferences[assigned_event_idx]:
+                    individually_stable = False
+                    break
+            if not individually_stable:
+                break
+
+        if individually_stable:
+            messages.success(request, "Individually Stable: No participant prefers another event over their assigned one.")
+        else:
+            messages.error(request, "Individually Stable: Some participants prefer other events over their assigned ones.")
+
+        # Check if the allocation is core stable
+        core_stable = True
+        for participant_idx, participant_preferences in enumerate(Preferences):
+            highest_preference = max(participant_preferences)
+            preferred_event_idx = participant_preferences.index(highest_preference)
+            if assignment_dict.get(participant_idx) != preferred_event_idx:
+                core_stable = False
+                break
+
+        if core_stable:
+            messages.success(request, "Core Stable: All participants are assigned to their most preferred events.")
+        else:
+            messages.error(request, "Core Stable: Some participants are not assigned to their most preferred events.")
+
+        return render(request, 'Organizer/allocation.html', {'participants': participants})
+    
+    except Exception as e:
+        print(e)
+        messages.error(request, 'Error viewing allocations!')
+        return render(request, 'Organizer/allocation.html')
 
 def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences):
     model = LpProblem("ActivityAssignment", LpMaximize)
@@ -371,6 +411,7 @@ def allocate_participants_new(request):
         participantactivity__event__in=events
     ).distinct()
     
+    print(participants)
     
     n = participants.count()
     a = events.count()
@@ -395,51 +436,91 @@ def allocate_participants_new(request):
             participant.assigned_to_new = event
             participant.save()
     
-    assignment_dict = {i: [] for i in range(len(Preferences))}
-    for i, j in assignments:
-        assignment_dict[i].append(j)
-
-    individually_rational = True
-    for i, j in assignments:
-        if Preferences[i][j] < 0:
-            individually_rational = False
-            break
-
-    if individually_rational:
-        messages.success(request, "Individually Rational: All participants have non-negative preferences.")
-
-    individually_stable = True
-    for i in range(len(Preferences)):
-        assigned_activity = assignment_dict.get(i, [])[0] if assignment_dict.get(i) else None
-        if assigned_activity is not None:
-            if not all(Preferences[i][j] < Preferences[i][assigned_activity] for j in assignment_dict[i] if j != assigned_activity):
-                individually_stable = False
-                break
-
-    if individually_stable:
-        messages.success(request, "Individually Stable: The assignment is individually stable.")
-    
-    core_stable = True
-    for i in range(len(Preferences)):
-        highest_preference = max(Preferences[i])
-        highest_activity = Preferences[i].index(highest_preference)
-        if highest_activity not in assignment_dict.get(i, []):
-            core_stable = False
-            break
-    
-    if core_stable:
-        messages.success(request, "Core Stable: The assignment is core stable.")
-
     return redirect('view_allocation_new')
 
 def view_allocation_new(request):
-    participants = Participant.objects.all()
-    return render(request, 'Organizer/new_allocation.html', {'participants': participants})
+    try:
+        # Get the events created by the current user (organizer)
+        events = Event.objects.filter(created_by=request.user)
 
+        # Filter participants who have given preferences to any of these events
+        participants = Participant.objects.filter(
+            participantactivity__event__in=events
+        ).distinct()
+
+        # Get the number of participants and events
+        n = participants.count()
+        a = events.count()
+
+        # Get the min and max bounds for events
+        min_bounds = list(events.values_list('min_participants', flat=True))
+        max_bounds = list(events.values_list('max_participants', flat=True))
+
+        # Prepare the Preferences matrix and assignment dictionary
+        Preferences = []
+        assignment_dict = {}
+        for idx, participant in enumerate(participants):
+            preferences = []
+            assigned_event = participant.assigned_to_new
+            assigned_event_idx = list(events).index(assigned_event) if assigned_event in events else None
+            if assigned_event_idx is not None:
+                assignment_dict[idx] = [assigned_event_idx]
+
+            for event in events:
+                activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
+                preferences.append(activity_preference.preference if activity_preference else 0)
+            Preferences.append(preferences)
+
+        # Check if the allocation is individually rational
+        individually_rational = True
+        for i, j in assignment_dict.items():
+            if Preferences[i][j[0]] < 0:
+                individually_rational = False
+                break
+
+        if individually_rational:
+            messages.success(request, "Individually Rational: All participants have non-negative preferences.")
+        else:
+            messages.error(request, "Individually Rational: Some participants have negative preferences.")
+
+        # Check if the allocation is individually stable
+        individually_stable = True
+        for i in range(len(Preferences)):
+            assigned_activity = assignment_dict.get(i, [])[0] if assignment_dict.get(i) else None
+            if assigned_activity is not None:
+                if not all(Preferences[i][j] < Preferences[i][assigned_activity] for j in range(a) if j != assigned_activity):
+                    individually_stable = False
+                    break
+
+        if individually_stable:
+            messages.success(request, "Individually Stable: The assignment is individually stable.")
+        else:
+            messages.error(request, "Individually Stable: The assignment is not individually stable.")
+
+        # Check if the allocation is core stable
+        core_stable = True
+        for i in range(len(Preferences)):
+            highest_preference = max(Preferences[i])
+            highest_activity = Preferences[i].index(highest_preference)
+            if highest_activity not in assignment_dict.get(i, []):
+                core_stable = False
+                break
+
+        if core_stable:
+            messages.success(request, "Core Stable: The assignment is core stable.")
+        else:
+            messages.error(request, "Core Stable: The assignment is not core stable.")
+
+        return render(request, 'Organizer/new_allocation.html', {'participants': participants})
+    
+    except Exception as e:
+        print(e)
+        messages.error(request, 'Error viewing allocations!')
+        return render(request, 'Organizer/new_allocation.html')
 
 def edit_allocation(request,):
     event = Event.objects.filter(is_active=True,created_by=request.user)
-    participants = Participant.objects.filter(assigned_to__in=event).select_related('assigned_to')
+    participants = Participant.objects.filter(participantactivity__event__in=event).distinct()
 
     if request.method == 'POST':
         new_allocations = {}
@@ -484,8 +565,7 @@ def edit_allocation(request,):
 
 def edit_allocation_new(request):
     event = Event.objects.filter(is_active=True,created_by=request.user)
-    participants = Participant.objects.filter(assigned_to_new__in=event).select_related('assigned_to_new')
-
+    participants = Participant.objects.filter(participantactivity__event__in=event).distinct()
     if request.method == 'POST':
         new_allocations = {}
         activity_counts = {activity.id: 0 for activity in event}
@@ -525,3 +605,212 @@ def edit_allocation_new(request):
         'participants': participants,
     }
     return render(request, 'Organizer/modify_allocation.html', context)
+
+
+def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences):
+    # Create the LP problem
+    prob = LpProblem("ActivityAssignment", LpMaximize)
+
+    # Decision variables
+    x = LpVariable.dicts("x", (range(n), range(a)), cat=LpBinary)  # x[i][j] = 1 if participant i is assigned to activity j
+    y = LpVariable.dicts("y", range(a), cat=LpBinary)  # y[j] = 1 if activity j is assigned
+
+    # Objective function: Maximize total preference sum
+    prob += lpSum(Preferences[i][j] * x[i][j] for i in range(n) for j in range(a)), "TotalPreferenceSum"
+
+    # Constraints
+
+    # Each participant can be assigned to at most one activity
+    for i in range(n):
+        prob += lpSum(x[i][j] for j in range(a)) <= 1, f"Participant_{i}_Assignment"
+
+    # Ensure each activity j has the correct number of participants assigned within bounds
+    for j in range(a):
+        prob += min_bounds[j] * y[j] <= lpSum(x[i][j] for i in range(n)), f"Min_Participants_Activity_{j}"
+        prob += lpSum(x[i][j] for i in range(n)) <= max_bounds[j] * y[j], f"Max_Participants_Activity_{j}"
+
+    # Ensure correct values for assigned activities
+    for j in range(a):
+        prob += lpSum(x[i][j] for i in range(n)) >= y[j], f"Activity_{j}_Activation"
+
+    # Solve the problem
+    prob.solve()
+
+    # Output results
+    assignments = []
+    for i in range(n):
+        for j in range(a):
+            if value(x[i][j]) > 0.5:  # Because variables are binary, this checks if they are 1
+                assignments.append((i, j))
+
+    assigned_activities = [j for j in range(a) if value(y[j]) > 0.5]
+
+    return assignments, assigned_activities
+
+@login_required
+def allocate_activities_max(request):
+    try:
+        # Get the events created by the current user (organizer)
+        events = Event.objects.filter(created_by=request.user)
+
+        # Filter participants who have given preferences to any of these events
+        participants = Participant.objects.filter(
+            participantactivity__event__in=events
+        ).distinct()
+
+        # Prepare data for optimization
+        n = participants.count()
+        a = events.count()
+        min_bounds = list(events.values_list('min_participants', flat=True))
+        max_bounds = list(events.values_list('max_participants', flat=True))
+    
+        Preferences = []
+        for participant in participants:
+            preferences = []
+            for event in events:
+                activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
+                preferences.append(activity_preference.preference if activity_preference else 0)
+            Preferences.append(preferences)
+
+        # Solve the assignment problem
+        assignments, assigned_activities = solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences)
+
+        # Save the assignment results back to the database
+        with transaction.atomic():
+            for participant_idx, event_idx in assignments:
+                participant = participants[participant_idx]
+                event = events[event_idx]
+                participant.assigned_to_max = event
+                participant.save()
+
+        messages.success(request, "Activity allocation completed successfully.")
+        return redirect('view_allocation_max')
+
+    except Exception as e:
+        print(e)
+        messages.error(request, 'Error during allocation process!')
+        return redirect('view_allocation_max')
+    
+@login_required
+def view_allocation_max(request):
+    try:
+        # Get the events created by the current user (organizer)
+        events = Event.objects.filter(created_by=request.user)
+
+        # Filter participants who have given preferences to any of these events
+        participants = Participant.objects.filter(
+            participantactivity__event__in=events
+        ).distinct()
+
+                # Get the number of participants and events
+        n = participants.count()
+        a = events.count()
+
+        # Get the min and max bounds for events
+        min_bounds = list(events.values_list('min_participants', flat=True))
+        max_bounds = list(events.values_list('max_participants', flat=True))
+
+        # Prepare the Preferences matrix and assignment dictionary
+        Preferences = []
+        assignment_dict = {}
+        for idx, participant in enumerate(participants):
+            preferences = []
+            assigned_event = participant.assigned_to_new
+            assigned_event_idx = list(events).index(assigned_event) if assigned_event in events else None
+            if assigned_event_idx is not None:
+                assignment_dict[idx] = [assigned_event_idx]
+
+            for event in events:
+                activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
+                preferences.append(activity_preference.preference if activity_preference else 0)
+            Preferences.append(preferences)
+
+        # Check if the allocation is individually rational
+        individually_rational = True
+        for i, j in assignment_dict.items():
+            if Preferences[i][j[0]] < 0:
+                individually_rational = False
+                break
+
+        if individually_rational:
+            messages.success(request, "Individually Rational: All participants have non-negative preferences.")
+        else:
+            messages.error(request, "Individually Rational: Some participants have negative preferences.")
+
+        # Check if the allocation is individually stable
+        individually_stable = True
+        for i in range(len(Preferences)):
+            assigned_activity = assignment_dict.get(i, [])[0] if assignment_dict.get(i) else None
+            if assigned_activity is not None:
+                if not all(Preferences[i][j] < Preferences[i][assigned_activity] for j in range(a) if j != assigned_activity):
+                    individually_stable = False
+                    break
+
+        if individually_stable:
+            messages.success(request, "Individually Stable: The assignment is individually stable.")
+        else:
+            messages.error(request, "Individually Stable: The assignment is not individually stable.")
+
+        # Check if the allocation is core stable
+        core_stable = True
+        for i in range(len(Preferences)):
+            highest_preference = max(Preferences[i])
+            highest_activity = Preferences[i].index(highest_preference)
+            if highest_activity not in assignment_dict.get(i, []):
+                core_stable = False
+                break
+
+        if core_stable:
+            messages.success(request, "Core Stable: The assignment is core stable.")
+        else:
+            messages.error(request, "Core Stable: The assignment is not core stable.")
+
+        return render(request, 'Organizer/max_allocation.html', {'participants': participants})
+
+    except Exception as e:
+        print(e)
+        messages.error(request, 'Error viewing allocations!')
+        return render(request, 'Organizer/max_allocation.html')
+
+def edit_allocation_max(request):
+    event = Event.objects.filter(is_active=True,created_by=request.user)
+    participants = Participant.objects.filter(participantactivity__event__in=event).distinct()
+    if request.method == 'POST':
+        new_allocations = {}
+        activity_counts = {activity.id: 0 for activity in event}
+
+        for participant in participants:
+            activity_id = request.POST.get(f'activity_{participant.id}')
+            if activity_id:
+                activity_id = int(activity_id)
+                if activity_id in new_allocations:
+                    new_allocations[activity_id].append(participant)
+                else:
+                    new_allocations[activity_id] = [participant]
+                activity_counts[activity_id] += 1
+
+        # Check for capacity issues
+        for activity_id, count in activity_counts.items():
+            activity = Event.objects.get(id=activity_id)
+            if count > activity.max_participants:
+                messages.warning(request, f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {activity.max_participants}. Currently allocated: {count}.")
+
+        # Update the participants' activity assignments
+        for participant in participants:
+            activity_id = request.POST.get(f'activity_{participant.id}')
+            if activity_id:
+                activity = Event.objects.get(id=int(activity_id))
+                participant.assigned_to_max = activity
+            else:
+                participant.assigned_to_max = None
+            participant.save()
+
+        messages.success(request, "Allocation updated successfully.")
+        return redirect('view_allocation_max',)
+
+    context = {
+        'event': event,
+        'activities': event,
+        'participants': participants,
+    }
+    return render(request, 'Organizer/modify_allocation_max.html', context)

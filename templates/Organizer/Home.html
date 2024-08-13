@@ -43,18 +43,38 @@
     <div class="container">
         <div class="row">
             <div class="col-md-12 justify-content-center d-flex mt-5">
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'allocate_participants' %}">Compute Allocation</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check Allocation</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation' %}">Modify Allocation</a> 
-
-               
-            
+                <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect()" href="javascript:void(0);">Compute
+                    Positive Pref. Activity</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check
+                    Positive Pref. Activity
+                    Pick</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation' %}">Modify
+                    Positive Pref. Activity
+                    Pick</a> 
             </div>
             <div class="col-md-12 justify-content-center d-flex mt-5">
-                <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect()" href="javascript:void(0);">Compute Allocation</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check Allocation</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_new' %}">Modify Allocation</a> 
+                <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect1()" href="javascript:void(0);">Compute
+                    Exclude Negative Pref.
+                    Activity</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check
+                    Exclude Negative
+                    Pref. Activity</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_new' %}">Modify
+                    Exclude Negative Pref.
+                    Activity</a> 
             </div>
+            <div class="col-md-12 justify-content-center d-flex mt-5">
+
+                <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect2()" href="javascript:void(0);">Compute
+                    Maximize Total sum
+                    pref. Value</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_max' %}">Check
+                    Maximize Total sum
+                    pref. Value</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_max' %}">Modify
+                    Maximize Total pref.
+                    Value</a> 
+                </div>
         </div>
     </div>
 
@@ -71,8 +91,16 @@
 
     <script>
         function showAlertAndRedirect() {
-            alert("Maximize the participants who get positive activities");
+            alert("Maximize Participants to positive preferred activities");
+            window.location.href = "{% url 'allocate_participants' %}";
+        }
+        function showAlertAndRedirect1() {
+            alert("Exclude negative preference");
             window.location.href = "{% url 'allocate_participants_new' %}";
+        }
+        function showAlertAndRedirect2() {
+            alert("Maximize Participants to total preference value");
+            window.location.href = "{% url 'allocate_activities_max' %}";
         }
     </script>
 </body>

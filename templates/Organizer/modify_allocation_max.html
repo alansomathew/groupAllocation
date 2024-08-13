@@ -1,0 +1,56 @@
+{% extends 'Organizer/Head.html' %}
+
+{% block content %}
+<br><br><br><br>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Participant Allocation</title>
+</head>
+
+<body>
+    <div class="container">
+
+        <form action="" method="post">
+            {% csrf_token %}
+            <table border="1" align="center" cellpadding="10" class="mt-3 table table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Participant</th>
+                        <th>Activity</th>
+                    </tr>
+                </thead>
+                <tbody class="table-group-divider">
+                    {% for participant in participants %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ participant.name }}</td>
+                        <td>
+                            <select name="activity_{{ participant.id }}" id="activity_{{ participant.id }}">
+                                <option value="">Not Allocated</option>
+                                {% for activity in activities %}
+                                <option value="{{ activity.id }}" {% if activity.id == participant.assigned_to_max.id %}
+                                    selected {% endif %}>
+                                    {{ activity.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="col-12 text-center mt-3 mb-2">
+                <button type="submit" class="btn btn-outline-primary">Update Allocation</button>
+            </div>
+        </form>
+    </div>
+</body>
+
+</html>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}

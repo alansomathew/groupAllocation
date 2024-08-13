@@ -18,5 +18,8 @@ urlpatterns = [
     path('edit-allocation-new/', views.edit_allocation_new, name='edit_allocation_new'),
     path('stop-event/<str:event_id>/', views.stop_event, name='stop_event'),
     path('start-event/<str:event_id>/', views.start_event, name='start_event'),
+    path('allocate-max/', views.allocate_activities_max,name='allocate_activities_max'),
+    path('view-allocation-max/', views.view_allocation_max,name='view_allocation_max'),
+    path('edit-allocation-max/', views.edit_allocation_max, name='edit_allocation_max'),
 
 ]

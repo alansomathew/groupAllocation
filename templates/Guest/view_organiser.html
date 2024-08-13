@@ -1,0 +1,72 @@
+{% extends 'Guest/Head.html'%}
+{% load static %}
+{%  block content %}
+<br><br><br><br>
+
+
+    <form action="" method="post">
+        {% csrf_token %}
+        <table align="center" cellpadding="10">
+            {% for i in data %}
+              
+            <td>
+              <a href="{% url 'choose_activity' i.id %}" style="text-decoration: none;">
+                <div style="text-align:center;border:1px solid black;margin:22px;padding:20px">
+
+                    <p>code :{{i.first_name}}  {{i.last_name}}</p>
+                    <p>{{i.email}}</p>
+                  
+                </div></a>
+            </td>
+            {% if forloop.counter|divisibleby:4 %}
+        </tr>
+        <tr>
+            {% endif %}
+
+
+            {% endfor %}
+            
+        </table>
+
+       
+
+    </form>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12 justify-content-center d-flex mt-5">
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'allocate_participants' %}">Compute Allocation</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check Allocation</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation' %}">Modify Allocation</a> 
+
+               
+            
+            </div>
+            <div class="col-md-12 justify-content-center d-flex mt-5">
+                <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect()" href="javascript:void(0);">Compute Allocation</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check Allocation</a> |
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_new' %}">Modify Allocation</a> 
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert  {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
+        data-timeout="3000" role="alert">
+        {{message}}
+        <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+
+    <script>
+        function showAlertAndRedirect() {
+            alert("Maximize the participants who get positive activities");
+            window.location.href = "{% url 'allocate_participants_new' %}";
+        }
+    </script>
+</body>
+</html>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+{% endblock content %}
