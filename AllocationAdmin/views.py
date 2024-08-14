@@ -264,20 +264,25 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
 
 
 def allocate_participants_to_activities(request):
+
+    # Get the active events created by the current user (organizer)
     events = Event.objects.filter(is_active=True, created_by=request.user)
-  # Filter participants who have given preferences to the selected events created by the current user
+
+    # Filter participants who have given preferences to the selected events
     participants = Participant.objects.filter(
         participantactivity__event__in=events
     ).distinct()
-    
 
-    
     n = participants.count()
     a = events.count()
-    
+
+    if n == 0 or a == 0:
+        messages.warning(request, "No participants or events available for allocation.")
+        return redirect('view_allocation')
+
     min_bounds = list(events.values_list('min_participants', flat=True))
     max_bounds = list(events.values_list('max_participants', flat=True))
-    
+
     Preferences = []
     for participant in participants:
         preferences = []
@@ -285,9 +290,10 @@ def allocate_participants_to_activities(request):
             activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
             preferences.append(activity_preference.preference if activity_preference else 0)
         Preferences.append(preferences)
-    
-    assignments, _ = solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences)
-    
+
+    # Solve the assignment problem
+    assignments, assigned_activities = solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences)
+
     # Update participant assignments in the database
     with transaction.atomic():
         for participant_idx, event_idx in assignments:
@@ -295,7 +301,19 @@ def allocate_participants_to_activities(request):
             event = events[event_idx]
             participant.assigned_to = event
             participant.save()
-    
+
+    # Check if all participants are allocated
+    if len(assignments) == n:
+        messages.success(request, "All participants are involved in the allocation.")
+    else:
+        messages.warning(request, "Not all participants are involved in the allocation.")
+
+    # Check if all events have at least one participant
+    if len(assigned_activities) == a:
+        messages.success(request, "All events have at least one participant.")
+    else:
+        messages.warning(request, "Not all events have participants.")
+
     return redirect('view_allocation')
 
 
@@ -427,7 +445,7 @@ def allocate_participants_new(request):
             preferences.append(activity_preference.preference if activity_preference else 0)
         Preferences.append(preferences)
     
-    assignments, _ = solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences)
+    assignments, assigned_activities = solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences)
     
     with transaction.atomic():
         for participant_idx, event_idx in assignments:
@@ -435,6 +453,18 @@ def allocate_participants_new(request):
             event = events[event_idx]
             participant.assigned_to_new = event
             participant.save()
+
+    # Check if all participants are allocated
+    if len(assignments) == n:
+        messages.success(request, "All participants are involved in the allocation.")
+    else:
+        messages.warning(request, "Not all participants are involved in the allocation.")
+
+    # Check if all events have at least one participant
+    if len(assigned_activities) == a:
+        messages.success(request, "All events have at least one participant.")
+    else:
+        messages.warning(request, "Not all events have participants.")
     
     return redirect('view_allocation_new')
 
@@ -683,8 +713,22 @@ def allocate_activities_max(request):
                 participant.assigned_to_max = event
                 participant.save()
 
+        
+
         messages.success(request, "Activity allocation completed successfully.")
-        return redirect('view_allocation_max')
+
+        # Check if all participants are allocated
+        if len(assignments) == n:
+            messages.success(request, "All participants are involved in the allocation.")
+        else:
+            messages.warning(request, "Not all participants are involved in the allocation.")
+
+        # Check if all events have at least one participant
+        if len(assigned_activities) == a:
+            messages.success(request, "All events have at least one participant.")
+        else:
+            messages.warning(request, "Not all events have participants.")
+            return redirect('view_allocation_max')
 
     except Exception as e:
         print(e)
