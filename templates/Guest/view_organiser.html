@@ -31,23 +31,7 @@
        
 
     </form>
-    <div class="container">
-        <div class="row">
-            <div class="col-md-12 justify-content-center d-flex mt-5">
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'allocate_participants' %}">Compute Allocation</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check Allocation</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation' %}">Modify Allocation</a> 
 
-               
-            
-            </div>
-            <div class="col-md-12 justify-content-center d-flex mt-5">
-                <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect()" href="javascript:void(0);">Compute Allocation</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check Allocation</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_new' %}">Modify Allocation</a> 
-            </div>
-        </div>
-    </div>
 
     {% if messages %}
     {% for message in messages %}
@@ -60,12 +44,6 @@
     {% endif %}
 
 
-    <script>
-        function showAlertAndRedirect() {
-            alert("Maximize the participants who get positive activities");
-            window.location.href = "{% url 'allocate_participants_new' %}";
-        }
-    </script>
 </body>
 </html>
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
