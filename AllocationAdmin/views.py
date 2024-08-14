@@ -713,10 +713,6 @@ def allocate_activities_max(request):
                 participant.assigned_to_max = event
                 participant.save()
 
-        
-
-        messages.success(request, "Activity allocation completed successfully.")
-
         # Check if all participants are allocated
         if len(assignments) == n:
             messages.success(request, "All participants are involved in the allocation.")
