@@ -34,7 +34,7 @@
                     </td>
                     <td>
                         {% for pa in participant.participantactivity_set.all %}
-                          {{ pa.event.name }}, Preference: {{ pa.preference }}<br>
+                          {{ pa.event.name }}: {{ pa.preference }} ,
                         {% endfor %}
                     </td>
                 </tr>

@@ -45,9 +45,9 @@
             <div class="col-md-12 justify-content-center d-flex mt-5">
                 <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect()" href="javascript:void(0);">Compute
                     Positive Pref. Activity</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check
+                <!-- <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check
                     Positive Pref. Activity
-                    Pick</a> |
+                    Pick</a> | -->
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation' %}">Modify
                     Positive Pref. Activity
                     Pick</a> 
@@ -56,9 +56,9 @@
                 <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect1()" href="javascript:void(0);">Compute
                     Exclude Negative Pref.
                     Activity</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check
+                <!-- <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check
                     Exclude Negative
-                    Pref. Activity</a> |
+                    Pref. Activity</a> | -->
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_new' %}">Modify
                     Exclude Negative Pref.
                     Activity</a> 
@@ -68,9 +68,9 @@
                 <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect2()" href="javascript:void(0);">Compute
                     Maximize Total sum
                     pref. Value</a> |
-                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_max' %}">Check
+                <!-- <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_max' %}">Check
                     Maximize Total sum
-                    pref. Value</a> |
+                    pref. Value</a> | -->
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_max' %}">Modify
                     Maximize Total pref.
                     Value</a> 
@@ -91,15 +91,15 @@
 
     <script>
         function showAlertAndRedirect() {
-            alert("Maximize Participants to positive preferred activities");
+            alert("Enhance Positive Selections\n\nParticipants have been assigned to their most suitable events based on their preferences.");
             window.location.href = "{% url 'allocate_participants' %}";
         }
         function showAlertAndRedirect1() {
-            alert("Exclude negative preference");
+            alert("Exclude Unfavorable Choices\n\nTo ensure satisfaction, less favored activities are not included in the allocation.");
             window.location.href = "{% url 'allocate_participants_new' %}";
         }
         function showAlertAndRedirect2() {
-            alert("Maximize Participants to total preference value");
+            alert("Best Overall Fit\n\nSet to achieve the highest total preference value for activities.");
             window.location.href = "{% url 'allocate_activities_max' %}";
         }
     </script>
