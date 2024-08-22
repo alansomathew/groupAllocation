@@ -355,6 +355,7 @@ def allocate_participants_to_activities(request):
     if individual_stability_violations:
         for violation in individual_stability_violations:
             messages.warning(request, violation)
+        messages.error(request,"The assignment is not individually stable")
     else:
         messages.success(request, "The assignment is individually stable.")
 
@@ -362,6 +363,7 @@ def allocate_participants_to_activities(request):
     if core_stability_violations:
         for violation in core_stability_violations:
             messages.warning(request, violation)
+        messages.error(request,"The assignment is not core stable")
     else:
         messages.success(request, "The assignment is core stable.")
 
@@ -369,6 +371,7 @@ def allocate_participants_to_activities(request):
     if individual_rationality_violations:
         for violation in individual_rationality_violations:
             messages.warning(request, violation)
+        messages.error(request,"The assignment is not individually rational")
     else:
         messages.success(request, "The assignment is individually rational.")
 
