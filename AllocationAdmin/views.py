@@ -511,27 +511,6 @@ def allocate_participants_new(request):
             participant.assigned_to_new = event
             participant.save()
 
-    # Provide feedback on individual stability
-    if individual_stability_violations:
-        for violation in individual_stability_violations:
-            messages.warning(request, violation)
-    else:
-        messages.success(request, "The assignment is individually stable.")
-
-    # Provide feedback on core stability
-    if core_stability_violations:
-        for violation in core_stability_violations:
-            messages.warning(request, violation)
-    else:
-        messages.success(request, "The assignment is core stable.")
-
-    # Provide feedback on individual rationality
-    if individual_rationality_violations:
-        for violation in individual_rationality_violations:
-            messages.warning(request, violation)
-    else:
-        messages.success(request, "The assignment is individually rational.")
-
     # Check if all participants are allocated
     if len(assignments) == n:
         messages.success(request, "All participants are involved in the allocation.")
@@ -543,6 +522,36 @@ def allocate_participants_new(request):
         messages.success(request, "All events have at least one participant.")
     else:
         messages.warning(request, "Not all events have participants.")
+
+    # Provide feedback on individual stability
+    if individual_stability_violations:
+        for violation in individual_stability_violations:
+            messages.warning(request, violation)
+
+        messages.error(request, 'The assignment is not individual stable')
+    else:
+        messages.success(request, "The assignment is individually stable.")
+
+    # Provide feedback on core stability
+    if core_stability_violations:
+        for violation in core_stability_violations:
+
+            messages.warning(request, violation)
+        
+        messages.error(request,'The assignment is not core stable')
+    else:
+        messages.success(request, "The assignment is core stable.")
+
+    # Provide feedback on individual rationality
+    if individual_rationality_violations:
+        for violation in individual_rationality_violations:
+            messages.warning(request, violation)
+        
+        messages.error(request, 'The assignment is not individually rational')
+    else:
+        messages.success(request, "The assignment is individually rational.")
+
+    
     
     return redirect('view_allocation_new')  
 
@@ -791,27 +800,6 @@ def allocate_activities_max(request):
                 participant.assigned_to_max = event
                 participant.save()
 
-        # Provide feedback on individual stability
-        if individual_stability_violations:
-            for violation in individual_stability_violations:
-                messages.warning(request, violation)
-        else:
-            messages.success(request, "The assignment is individually stable.")
-
-        # Provide feedback on core stability
-        if core_stability_violations:
-            for violation in core_stability_violations:
-                messages.warning(request, violation)
-        else:
-            messages.success(request, "The assignment is core stable.")
-
-        # Provide feedback on individual rationality
-        if individual_rationality_violations:
-            for violation in individual_rationality_violations:
-                messages.warning(request, violation)
-        else:
-            messages.success(request, "The assignment is individually rational.")
-
         # Check if all participants are allocated
         if len(assignments) == n:
             messages.success(request, "All participants are involved in the allocation.")
@@ -823,6 +811,31 @@ def allocate_activities_max(request):
             messages.success(request, "All events have at least one participant.")
         else:
             messages.warning(request, "Not all events have participants.")
+
+        # Provide feedback on individual stability
+        if individual_stability_violations:
+            for violation in individual_stability_violations:
+                messages.warning(request, violation)
+
+            messages.error(request,"The assignment is not individually stable.")
+        else:
+            messages.success(request, "The assignment is individually stable.")
+
+        # Provide feedback on core stability
+        if core_stability_violations:
+            for violation in core_stability_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not core stable.")
+        else:
+            messages.success(request, "The assignment is core stable.")
+
+        # Provide feedback on individual rationality
+        if individual_rationality_violations:
+            for violation in individual_rationality_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not individually rational.")
+        else:
+            messages.success(request, "The assignment is individually rational.")
 
         return redirect('view_allocation_max')
 
