@@ -287,9 +287,8 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
     
     # Check Individual Rationality
     individual_rationality_violations = []
-    for i in range(n):
-        assigned_event = next(j for j in range(a) if value(x[i, j]) > 0.5)
-        if any(Preferences[i][j] > Preferences[i][assigned_event] for j in range(a)):
+    # Check Individual Rationality
+    if Preferences[i][assigned_event] <= 0:
             individual_rationality_violations.append(
                 f"Participant {i} is not individually rational in their assigned event."
             )
@@ -470,9 +469,8 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences):
 
     # Check for individual rationality
     individual_rationality_violations = []
-    for i in range(n):
-        assigned_event = next(j for j in range(a) if x[i, j].varValue > 0.5)
-        if any(Preferences[i][j] > Preferences[i][assigned_event] for j in range(a)):
+    # Check Individual Rationality
+    if Preferences[i][assigned_event] <= 0:
             individual_rationality_violations.append(
                 f"Participant {i} is not individually rational in their assigned event."
             )
