@@ -214,7 +214,7 @@ def list_participants(request, id):
 
 
 
-def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
+def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, participant_names, event_names):
     # Define the model
     model = LpProblem("ActivityAssignment", LpMaximize)
     
@@ -229,7 +229,6 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
     model += lpSum(normalized_preferences[i][j] * x[i, j] for i in range(n) for j in range(a))
     
     # Constraints
-
     # Each participant must be assigned to at most one activity
     for i in range(n):
         model += lpSum(x[i, j] for j in range(a)) <= 1
@@ -266,7 +265,7 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
         for j in range(a):
             if Preferences[i][j] > Preferences[i][assigned_event] and value(x[i, j]) == 0:
                 individual_stability_violations.append(
-                    f"Participant {i} can improve by switching from event {assigned_event} to event {j}."
+                    f"{participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
                 )
     
     # Check Core Stability
@@ -282,15 +281,16 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
                         break
                 if can_switch:
                     core_stability_violations.append(
-                        f"Participant {i} and others can jointly benefit by switching to event {j}."
+                        f"{participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
                     )
     
     # Check Individual Rationality
     individual_rationality_violations = []
-    # Check Individual Rationality
-    if Preferences[i][assigned_event] <= 0:
+    for i in range(n):
+        assigned_event = next(j for j in range(a) if value(x[i, j]) > 0.5)
+        if Preferences[i][assigned_event] <= 0:
             individual_rationality_violations.append(
-                f"Participant {i} is not individually rational in their assigned event."
+                f"{participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
             )
     
     return (assignments, assigned_activities, 
@@ -298,14 +298,9 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences):
             individual_rationality_violations)
 
 
-
-
 def allocate_participants_to_activities(request):
-
     # Get the active events created by the current user (organizer)
     events = Event.objects.filter(is_active=True, created_by=request.user)
-
-    # Filter participants who have given preferences to the selected events
     participants = Participant.objects.filter(
         participantactivity__event__in=events
     ).distinct()
@@ -321,15 +316,21 @@ def allocate_participants_to_activities(request):
     max_bounds = list(events.values_list('max_participants', flat=True))
 
     Preferences = []
+    participant_names = []
+    event_names = list(events.values_list('name', flat=True))
+
     for participant in participants:
         preferences = []
+        participant_names.append(participant.name)  # Assuming 'name' is the participant's name field
         for event in events:
             activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
             preferences.append(activity_preference.preference if activity_preference else 0)
         Preferences.append(preferences)
 
     # Solve the assignment problem
-    assignments, assigned_activities,individual_stability_violations, core_stability_violations,individual_rationality_violations = solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences)
+    assignments, assigned_activities, individual_stability_violations, core_stability_violations, individual_rationality_violations = solve_activity_assignment(
+        n, a, min_bounds, max_bounds, Preferences, participant_names, event_names
+    )
 
     # Update participant assignments in the database
     with transaction.atomic():
@@ -416,7 +417,7 @@ def view_allocation(request):
         messages.error(request, 'Error viewing allocations!')
         return render(request, 'Organizer/allocation.html')
 
-def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences):
+def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, participants, events):
     model = LpProblem("ActivityAssignment", LpMaximize)
     x = LpVariable.dicts("x", ((i, j) for i in range(n) for j in range(a)), cat=LpBinary)
     y = LpVariable.dicts("y", (j for j in range(a)), cat=LpBinary)
@@ -444,6 +445,9 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences):
     assignments = [(i, j) for i in range(n) for j in range(a) if x[i, j].varValue > 0.5]
     assigned_activities = [j for j in range(a) if y[j].varValue > 0.5]
 
+    # Mapping indices to names
+    participant_names = [p.name for p in participants]
+    event_names = [e.name for e in events]
 
     # Check for individual stability
     individual_stability_violations = []
@@ -452,12 +456,13 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences):
         for j in range(a):
             if Preferences[i][j] > Preferences[i][assigned_event] and x[i, j].varValue == 0:
                 individual_stability_violations.append(
-                    f"Participant {i} can improve by switching from event {assigned_event} to event {j}."
+                    f" {participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
                 )
 
     # Check for core stability
     core_stability_violations = []
     for i in range(n):
+        assigned_event = next(j for j in range(a) if x[i, j].varValue > 0.5)
         for j in range(a):
             if Preferences[i][j] > Preferences[i][assigned_event] and x[i, j].varValue == 0:
                 can_switch = True
@@ -467,20 +472,22 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences):
                         break
                 if can_switch:
                     core_stability_violations.append(
-                        f"Participant {i} and others can jointly benefit by switching to event {j}."
+                        f" {participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
                     )
 
     # Check for individual rationality
     individual_rationality_violations = []
-    # Check Individual Rationality
-    if Preferences[i][assigned_event] <= 0:
+    for i in range(n):
+        assigned_event = next(j for j in range(a) if x[i, j].varValue > 0.5)
+        if Preferences[i][assigned_event] <= 0:
             individual_rationality_violations.append(
-                f"Participant {i} is not individually rational in their assigned event."
+                f" {participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
             )
 
     return (assignments, assigned_activities, 
             individual_stability_violations, core_stability_violations, 
             individual_rationality_violations)
+
 
 
 def allocate_participants_new(request):
@@ -505,7 +512,9 @@ def allocate_participants_new(request):
     
     (assignments, assigned_activities,
      individual_stability_violations, core_stability_violations, 
-     individual_rationality_violations) = solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences)
+     individual_rationality_violations) = solve_activity_assignment_pulp(
+        n, a, min_bounds, max_bounds, Preferences, participants, events
+    )
     
     with transaction.atomic():
         for participant_idx, event_idx in assignments:
@@ -538,7 +547,6 @@ def allocate_participants_new(request):
     # Provide feedback on core stability
     if core_stability_violations:
         for violation in core_stability_violations:
-
             messages.warning(request, violation)
         
         messages.error(request,'The assignment is not core stable')
@@ -554,8 +562,6 @@ def allocate_participants_new(request):
     else:
         messages.success(request, "The assignment is individually rational.")
 
-    
-    
     return redirect('view_allocation_new')  
 
 def view_allocation_new(request):
@@ -687,7 +693,7 @@ def edit_allocation_new(request):
     return render(request, 'Organizer/modify_allocation.html', context)
 
 
-def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences):
+def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, participants, events):
     # Create the LP problem
     prob = LpProblem("ActivityAssignment", LpMaximize)
 
@@ -725,10 +731,14 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences):
 
     assigned_activities = [j for j in range(a) if value(y[j]) > 0.5]
 
-    individual_stability_violations = []
-    core_stability_violations = []
-    individual_rationality_violations = []
+    # Mapping indices to names
+    participant_names = [p.name for p in participants]
+    event_names = [e.name for e in events]
 
+    # Check for individual stability
+    individual_stability_violations = []
+    individual_rationality_violations=[]
+    core_stability_violations=[]
     for i in range(n):
         assigned_event = next((j for j in range(a) if value(x[i][j]) > 0.5), None)
         if assigned_event is None:
@@ -738,13 +748,13 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences):
         for j in range(a):
             if Preferences[i][j] > Preferences[i][assigned_event] and value(x[i][j]) == 0:
                 individual_stability_violations.append(
-                    f"Participant {i} can improve by switching from event {assigned_event} to event {j}."
+                    f"{participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
                 )
 
         # Check Individual Rationality
         if Preferences[i][assigned_event] <= 0:
             individual_rationality_violations.append(
-                f"Participant {i} is not individually rational in their assigned event."
+                f" {participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
             )
 
         # Check Core Stability
@@ -757,7 +767,7 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences):
                         break
                 if can_switch:
                     core_stability_violations.append(
-                        f"Participant {i} and others can jointly benefit by switching to event {j}."
+                        f" {participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
                     )
 
     return (assignments, assigned_activities, 
@@ -793,7 +803,9 @@ def allocate_activities_max(request):
         # Solve the assignment problem
         (assignments, assigned_activities,
          individual_stability_violations, core_stability_violations, 
-         individual_rationality_violations) = solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences)
+         individual_rationality_violations) = solve_activity_assignment_max(
+            n, a, min_bounds, max_bounds, Preferences, participants, events
+        )
 
         # Save the assignment results back to the database
         with transaction.atomic():
@@ -819,8 +831,7 @@ def allocate_activities_max(request):
         if individual_stability_violations:
             for violation in individual_stability_violations:
                 messages.warning(request, violation)
-
-            messages.error(request,"The assignment is not individually stable.")
+            messages.error(request, "The assignment is not individually stable.")
         else:
             messages.success(request, "The assignment is individually stable.")
 
@@ -847,10 +858,6 @@ def allocate_activities_max(request):
         messages.error(request, 'Error during the allocation process!')
         return redirect('view_allocation_max')
 
-    except Exception as e:
-        print(e)
-        messages.error(request, 'Error during allocation process!')
-        return redirect('view_allocation_max')
     
 @login_required
 def view_allocation_max(request):

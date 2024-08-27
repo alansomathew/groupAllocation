@@ -86,17 +86,23 @@
 
     <script>
         function showAlertAndRedirect() {
-            alert("Enhance Positive Selections\n\nParticipants have been assigned to their most suitable events based on their preferences.");
-            window.location.href = "{% url 'allocate_participants' %}";
-        }
-        function showAlertAndRedirect1() {
-            alert("Exclude Unfavorable Choices\n\nTo ensure satisfaction, less favored activities are not included in the allocation.");
-            window.location.href = "{% url 'allocate_participants_new' %}";
-        }
-        function showAlertAndRedirect2() {
-            alert("Best Overall Fit\n\nSet to achieve the highest total preference value for activities.");
-            window.location.href = "{% url 'allocate_activities_max' %}";
-        }
+    if (confirm("Enhance Positive Selections\n\nParticipants have been assigned to their most suitable events based on their preferences.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
+        window.location.href = "{% url 'allocate_participants' %}";
+    }
+}
+
+function showAlertAndRedirect1() {
+    if (confirm("Exclude Unfavorable Choices\n\nTo ensure satisfaction, less favored activities are not included in the allocation.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
+        window.location.href = "{% url 'allocate_participants_new' %}";
+    }
+}
+
+function showAlertAndRedirect2() {
+    if (confirm("Best Overall Fit\n\nSet to achieve the highest total preference value for activities.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
+        window.location.href = "{% url 'allocate_activities_max' %}";
+    }
+}
+
     </script>
 </body>
 </html>
