@@ -604,13 +604,13 @@ def view_allocation_new(request):
         messages.error(request, 'Error viewing allocations!')
         return render(request, 'Organizer/new_allocation.html')
 
-def edit_allocation(request,):
-    event = Event.objects.filter(is_active=True,created_by=request.user)
-    participants = Participant.objects.filter(participantactivity__event__in=event).distinct()
+def edit_allocation(request):
+    events = Event.objects.filter(is_active=True, created_by=request.user)
+    participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
 
     if request.method == 'POST':
         new_allocations = {}
-        activity_counts = {activity.id: 0 for activity in event}
+        activity_counts = {activity.id: 0 for activity in events}
 
         for participant in participants:
             activity_id = request.POST.get(f'activity_{participant.id}')
@@ -626,24 +626,29 @@ def edit_allocation(request,):
         for activity_id, count in activity_counts.items():
             activity = Event.objects.get(id=activity_id)
             if count > activity.max_participants:
-                messages.warning(request, f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {activity.max_participants}. Currently allocated: {count}.")
+                messages.warning(
+                    request,
+                    f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {activity.max_participants}. Currently allocated: {count}."
+                )
 
         # Update the participants' activity assignments
         for participant in participants:
             activity_id = request.POST.get(f'activity_{participant.id}')
             if activity_id:
                 activity = Event.objects.get(id=int(activity_id))
-                participant.assigned_to= activity
+                participant.assigned_to = activity
             else:
-                participant.assigned_to= None
+                participant.assigned_to = None
             participant.save()
 
+        # Update the `is_updated` flag for all events involved
+        events.update(is_updated=True)
+
         messages.success(request, "Allocation updated successfully.")
-        return redirect('view_allocation',)
+        return redirect('view_allocation')
 
     context = {
-        'event': event,
-        'activities': event,
+        'events': events,
         'participants': participants,
     }
     return render(request, 'Organizer/modify.html', context)
@@ -681,6 +686,9 @@ def edit_allocation_new(request):
             else:
                 participant.assigned_to_new = None
             participant.save()
+
+        event.is_updated_new=True
+        event.save()
 
         messages.success(request, "Allocation updated successfully.")
         return redirect('view_allocation_new',)
@@ -932,6 +940,9 @@ def edit_allocation_max(request):
             else:
                 participant.assigned_to_max = None
             participant.save()
+
+        event.is_updated_max=True
+        event.save()
 
         messages.success(request, "Allocation updated successfully.")
         return redirect('view_allocation_max',)

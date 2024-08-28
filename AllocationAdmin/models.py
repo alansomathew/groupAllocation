@@ -9,6 +9,9 @@ class Event(models.Model):
     max_participants=models.IntegerField()
     code=models.CharField(max_length=50,unique=True)
     is_active = models.BooleanField(default=True)
+    is_updated = models.BooleanField(default=False)
+    is_updated_new = models.BooleanField(default=False)
+    is_updated_max = models.BooleanField(default=False)
     created_by=models.ForeignKey(User,on_delete=models.CASCADE)
     created_on=models.DateTimeField(auto_now_add=True)
 

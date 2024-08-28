@@ -16,14 +16,14 @@
 
             </tr>
            <tr>
-            {% for i in data %}
+            {% for event in data %}
               
             <td>
-              <a href="{% url 'event_details' i.id %}" style="text-decoration: none;">
+              <a href="{% url 'event_details' event.id %}" style="text-decoration: none;">
                 <div style="text-align:center;border:1px solid black;margin:22px;padding:20px">
 
-                    <p>code :{{i.code}}</p>
-                    <p>{{i.name}}</p>
+                    <p>code :{{event.code}}</p>
+                    <p>{{event.name}}</p>
                   
                 </div></a>
             </td>
@@ -48,8 +48,7 @@
                     Positive Pref. Activity
                     Pick</a> | -->
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation' %}">Modify
-                    Positive Pref. Activity
-                    Pick</a> 
+                    Top picks</a> 
             </div>
             <div class="col-md-12 justify-content-center d-flex mt-5">
                 <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect1()" href="javascript:void(0);">Exclude dislikes</a> |
@@ -57,8 +56,7 @@
                     Exclude Negative
                     Pref. Activity</a> | -->
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_new' %}">Modify
-                    Exclude Negative Pref.
-                    Activity</a> 
+                    Exclude dislikes</a> 
             </div>
             <div class="col-md-12 justify-content-center d-flex mt-5">
 
@@ -67,8 +65,7 @@
                     Maximize Total sum
                     pref. Value</a> | -->
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_max' %}">Modify
-                    Maximize Total pref.
-                    Value</a> 
+                    Highest Score</a> 
                 </div>
         </div>
     </div>
