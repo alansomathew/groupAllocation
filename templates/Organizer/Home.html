@@ -43,30 +43,43 @@
     <div class="container">
         <div class="row">
             <div class="col-md-12 justify-content-center d-flex mt-5">
+                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect({{ is_updated|yesno:'true,false' }})" href="javascript:void(0);">Top picks</a> |
+                <a class="btn btn-sm btn-primary text-center" href="{% url 'edit_allocation' %}">Modify Top picks</a>
+            </div>
+            <div class="col-md-12 justify-content-center d-flex mt-5">
+                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect1({{ is_updated_new|yesno:'true,false' }})" href="javascript:void(0);">Exclude dislikes</a> |
+                <a class="btn btn-sm btn-primary text-center" href="{% url 'edit_allocation_new' %}">Modify Exclude dislikes</a>
+            </div>
+            <div class="col-md-12 justify-content-center d-flex mt-5">
+                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect2({{ is_updated_max|yesno:'true,false' }})" href="javascript:void(0);">Highest Score</a> |
+                <a class="btn btn-sm btn-primary text-center" href="{% url 'edit_allocation_max' %}">Modify Highest Score</a>
+            </div>
+            
+            <!-- <div class="col-md-12 justify-content-center d-flex mt-5">
                 <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect()" href="javascript:void(0);">Top picks</a> |
-                <!-- <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation' %}">Check
                     Positive Pref. Activity
-                    Pick</a> | -->
+                    Pick</a> |
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation' %}">Modify
                     Top picks</a> 
             </div>
             <div class="col-md-12 justify-content-center d-flex mt-5">
                 <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect1()" href="javascript:void(0);">Exclude dislikes</a> |
-                <!-- <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_new' %}">Check
                     Exclude Negative
-                    Pref. Activity</a> | -->
+                    Pref. Activity</a> |
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_new' %}">Modify
                     Exclude dislikes</a> 
             </div>
             <div class="col-md-12 justify-content-center d-flex mt-5">
 
                 <a class="btn btn-sm btn-primary text-center " onclick="showAlertAndRedirect2()" href="javascript:void(0);">Highest Score</a> |
-                <!-- <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_max' %}">Check
+                <a class="btn btn-sm btn-primary text-center " href="{% url 'view_allocation_max' %}">Check
                     Maximize Total sum
-                    pref. Value</a> | -->
+                    pref. Value</a> |
                 <a class="btn btn-sm btn-primary text-center " href="{% url 'edit_allocation_max' %}">Modify
                     Highest Score</a> 
-                </div>
+                </div> -->
         </div>
     </div>
 
@@ -82,25 +95,43 @@
 
 
     <script>
-        function showAlertAndRedirect() {
-    if (confirm("Enhance Positive Selections\n\nParticipants have been assigned to their most suitable events based on their preferences.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
-        window.location.href = "{% url 'allocate_participants' %}";
-    }
-}
-
-function showAlertAndRedirect1() {
-    if (confirm("Exclude Unfavorable Choices\n\nTo ensure satisfaction, less favored activities are not included in the allocation.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
-        window.location.href = "{% url 'allocate_participants_new' %}";
-    }
-}
-
-function showAlertAndRedirect2() {
-    if (confirm("Best Overall Fit\n\nSet to achieve the highest total preference value for activities.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
-        window.location.href = "{% url 'allocate_activities_max' %}";
-    }
-}
-
+        function showAlertAndRedirect(isUpdated) {
+            if (isUpdated) {
+                if (!confirm("The allocation has already been updated. Are you sure you want to run it again?")) {
+                    return;
+                }
+            }
+    
+            if (confirm("Enhance Positive Selections\n\nParticipants have been assigned to their most suitable events based on their preferences.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
+                window.location.href = "{% url 'allocate_participants' %}";
+            }
+        }
+    
+        function showAlertAndRedirect1(isUpdatedNew) {
+            if (isUpdatedNew) {
+                if (!confirm("The allocation with exclusions has already been updated. Are you sure you want to run it again?")) {
+                    return;
+                }
+            }
+    
+            if (confirm("Exclude Unfavorable Choices\n\nTo ensure satisfaction, less favored activities are not included in the allocation.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
+                window.location.href = "{% url 'allocate_participants_new' %}";
+            }
+        }
+    
+        function showAlertAndRedirect2(isUpdatedMax) {
+            if (isUpdatedMax) {
+                if (!confirm("The highest score allocation has already been updated. Are you sure you want to run it again?")) {
+                    return;
+                }
+            }
+    
+            if (confirm("Best Overall Fit\n\nSet to achieve the highest total preference value for activities.\n\nClick 'OK' to proceed or 'Cancel' to stay.")) {
+                window.location.href = "{% url 'allocate_activities_max' %}";
+            }
+        }
     </script>
+    
 </body>
 </html>
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>

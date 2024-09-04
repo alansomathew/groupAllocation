@@ -1,9 +1,9 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.models import User
+
 from django.contrib import messages
 from django.urls import reverse
-from AllocationAdmin.models import Event, Participant, ParticipantActivity
+from AllocationAdmin.models import CustomUser, Event, Participant, ParticipantActivity
 
 
 # Create your views here.
@@ -49,7 +49,7 @@ def user_logout(request):
 def view_organiser(request):
     try:
         # Get distinct users who have created events
-        organisers = User.objects.filter(event__isnull=False).distinct()
+        organisers = CustomUser.objects.filter(event__isnull=False).distinct()
 
         # Render the result to the template
         return render(request, 'Guest/view_organiser.html',{"data":organisers})
@@ -66,7 +66,7 @@ def signup(request):
             last_name = request.POST.get('txtLname').strip()
             email = request.POST.get('txtEmail').strip()
 
-            user = User.objects.create_user(
+            user = CustomUser.objects.create_user(
                 username=email, password=password, first_name=first_name, last_name=last_name,  email=email)
             user.save()
             messages.success(request, 'Account created successfully')
@@ -107,7 +107,7 @@ def create_participant(request):
 def choose_activity(request, id):
     par=request.session['participant']
     participant = get_object_or_404(Participant, id=par)
-    user=User.objects.get(id=id)
+    user=CustomUser.objects.get(id=id)
     events = Event.objects.filter(is_active=True,created_by=user)
     
     if request.method == 'POST':

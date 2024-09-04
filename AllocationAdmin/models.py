@@ -1,7 +1,19 @@
 from django.db import models
-from django.contrib.auth.models import User
 
 # Create your models here.
+
+from django.contrib.auth.models import AbstractUser
+
+from groupAllocation import settings
+
+class CustomUser(AbstractUser):
+    is_updated = models.BooleanField(default=False)
+    is_updated_new = models.BooleanField(default=False)
+    is_updated_max = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.username
+
 class Event(models.Model):
     name=models.CharField(max_length=50)
     description=models.TextField(null=True,blank=True)
@@ -12,7 +24,7 @@ class Event(models.Model):
     is_updated = models.BooleanField(default=False)
     is_updated_new = models.BooleanField(default=False)
     is_updated_max = models.BooleanField(default=False)
-    created_by=models.ForeignKey(User,on_delete=models.CASCADE)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE)
     created_on=models.DateTimeField(auto_now_add=True)
 
 

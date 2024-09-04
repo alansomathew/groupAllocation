@@ -13,7 +13,19 @@ def index(request):
     data = Event.objects.filter(created_by=request.user,).order_by(
         "-created_on"
     )
-    return render(request, "Organizer/Home.html", {"data": data})
+    user=request.user
+    is_updated = request.user.is_updated  # Assuming `is_updated` is a field in your custom user model
+    is_updated_new = request.user.is_updated_new  # Assuming `is_updated_new` is a field in your custom user model
+    is_updated_max = request.user.is_updated_max  # Assuming `is_updated_max` is a field in your custom user model
+
+    context={
+        "data": data,
+        "is_updated": is_updated,
+        "is_updated_new": is_updated_new,
+        "is_updated_max": is_updated_max,  # Assuming `is_updated_max` is a field in your custom user model
+    }
+
+    return render(request, "Organizer/Home.html",context)
 
 
 def events(request):
@@ -644,6 +656,10 @@ def edit_allocation(request):
         # Update the `is_updated` flag for all events involved
         events.update(is_updated=True)
 
+        user=request.user
+        user.is_updated=True
+        user.save()
+
         messages.success(request, "Allocation updated successfully.")
         return redirect('view_allocation')
 
@@ -689,6 +705,10 @@ def edit_allocation_new(request):
 
         event.is_updated_new=True
         event.save()
+
+        user=request.user
+        user.is_updated_new=True
+        user.save()
 
         messages.success(request, "Allocation updated successfully.")
         return redirect('view_allocation_new',)
@@ -943,6 +963,10 @@ def edit_allocation_max(request):
 
         event.is_updated_max=True
         event.save()
+
+        user=request.user
+        user.is_updated_max=True
+        user.save()
 
         messages.success(request, "Allocation updated successfully.")
         return redirect('view_allocation_max',)
