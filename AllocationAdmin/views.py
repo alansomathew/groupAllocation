@@ -654,7 +654,7 @@ def edit_allocation(request):
             participant.save()
 
         # Update the `is_updated` flag for all events involved
-        events.update(is_updated=True)
+        
 
         user=request.user
         user.is_updated=True
@@ -703,8 +703,7 @@ def edit_allocation_new(request):
                 participant.assigned_to_new = None
             participant.save()
 
-        event.is_updated_new=True
-        event.save()
+        
 
         user=request.user
         user.is_updated_new=True
@@ -961,8 +960,6 @@ def edit_allocation_max(request):
                 participant.assigned_to_max = None
             participant.save()
 
-        event.is_updated_max=True
-        event.save()
 
         user=request.user
         user.is_updated_max=True
