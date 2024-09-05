@@ -32,7 +32,7 @@
                         <td>
                             <select name="activity_{{ participant.id }}" id="activity_{{ participant.id }}">
                                 <option value="">Not Allocated</option>
-                                {% for activity in activities %}
+                                {% for activity in events %}
                                 <option value="{{ activity.id }}" {% if activity.id == participant.assigned_to.id %}
                                     selected {% endif %}>
                                     {{ activity.name }}
