@@ -43,15 +43,15 @@
     <div class="container">
         <div class="row">
             <div class="col-md-12 justify-content-center d-flex mt-5">
-                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect({{ is_updated|yesno:'true,false' }})" href="javascript:void(0);">Top picks</a> |
+                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect({{ is_updated|yesno:'1,0' }})" href="javascript:void(0);">Top picks</a> |
                 <a class="btn btn-sm btn-primary text-center" href="{% url 'edit_allocation' %}">Modify Top picks</a>
             </div>
             <div class="col-md-12 justify-content-center d-flex mt-5">
-                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect1({{ is_updated_new|yesno:'true,false' }})" href="javascript:void(0);">Exclude dislikes</a> |
+                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect1({{ is_updated_new|yesno:'1,0' }})" href="javascript:void(0);">Exclude dislikes</a> |
                 <a class="btn btn-sm btn-primary text-center" href="{% url 'edit_allocation_new' %}">Modify Exclude dislikes</a>
             </div>
             <div class="col-md-12 justify-content-center d-flex mt-5">
-                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect2({{ is_updated_max|yesno:'true,false' }})" href="javascript:void(0);">Highest Score</a> |
+                <a class="btn btn-sm btn-primary text-center" onclick="showAlertAndRedirect2({{ is_updated_max|yesno:'1,0' }})" href="javascript:void(0);">Highest Score</a> |
                 <a class="btn btn-sm btn-primary text-center" href="{% url 'edit_allocation_max' %}">Modify Highest Score</a>
             </div>
             
