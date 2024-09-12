@@ -285,8 +285,7 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, partici
         for j in range(a):
             if Preferences[i][j] > Preferences[i][assigned_event] and value(x[i, j]) == 0:
                 individual_stability_violations.append(
-                    f"{participant_names[i]} can improve by switching from  {
-                        event_names[assigned_event]} to  {event_names[j]}."
+                    f"{participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
                 )
 
     # Check Core Stability
@@ -302,8 +301,7 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, partici
                         break
                 if can_switch:
                     core_stability_violations.append(
-                        f"{participant_names[i]} and others can jointly benefit by switching to  {
-                            event_names[j]}."
+                        f"{participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
                     )
 
     # Check Individual Rationality
@@ -312,8 +310,7 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, partici
         assigned_event = next(j for j in range(a) if value(x[i, j]) > 0.5)
         if Preferences[i][assigned_event] <= 0:
             individual_rationality_violations.append(
-                f"{participant_names[i]} is not individually rational in their assigned  {
-                    event_names[assigned_event]}."
+                f"{participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
             )
 
     return (assignments, assigned_activities,
@@ -459,8 +456,7 @@ def view_allocation(request):
                 for j in range(a):
                     if Preferences[i][j] > Preferences[i][assigned_event] and assignment_dict.get(i) != j:
                         individual_stability_violations.append(
-                            f"{participant_names[i]} can improve by switching from {
-                                event_names[assigned_event]} to {event_names[j]}."
+                            f"{participant_names[i]} can improve by switching from {event_names[assigned_event]} to {event_names[j]}."
                         )
 
         # Check core stability
@@ -477,8 +473,7 @@ def view_allocation(request):
                                 break
                         if can_switch:
                             core_stability_violations.append(
-                                f"{participant_names[i]} and others can jointly benefit by switching to {
-                                    event_names[j]}."
+                                f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
                             )
 
         # Check individual rationality
@@ -488,8 +483,7 @@ def view_allocation(request):
                 assigned_event = assignment_dict[i]
                 if Preferences[i][assigned_event] <= 0:
                     individual_rationality_violations.append(
-                        f"{participant_names[i]} is not individually rational in their assigned {
-                            event_names[assigned_event]}."
+                        f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event]}."
                     )
 
         # Add messages for individual stability violations
@@ -577,8 +571,7 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, pa
         for j in range(a):
             if Preferences[i][j] > Preferences[i][assigned_event] and x[i, j].varValue == 0:
                 individual_stability_violations.append(
-                    f" {participant_names[i]} can improve by switching from  {
-                        event_names[assigned_event]} to  {event_names[j]}."
+                    f" {participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
                 )
 
     # Check for core stability
@@ -594,8 +587,7 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, pa
                         break
                 if can_switch:
                     core_stability_violations.append(
-                        f" {participant_names[i]} and others can jointly benefit by switching to  {
-                            event_names[j]}."
+                        f" {participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
                     )
 
     # Check for individual rationality
@@ -604,8 +596,7 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, pa
         assigned_event = next(j for j in range(a) if x[i, j].varValue > 0.5)
         if Preferences[i][assigned_event] <= 0:
             individual_rationality_violations.append(
-                f" {participant_names[i]} is not individually rational in their assigned  {
-                    event_names[assigned_event]}."
+                f" {participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
             )
 
     return (assignments, assigned_activities,
@@ -747,15 +738,13 @@ def view_allocation_new(request):
             for j in range(a):
                 if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
                     individual_stability_violations.append(
-                        f"{participant_names[i]} can improve by switching from {
-                            event_names[assigned_event_idx]} to {event_names[j]}."
+                        f"{participant_names[i]} can improve by switching from {event_names[assigned_event_idx]} to {event_names[j]}."
                     )
 
             # Check Individual Rationality
             if Preferences[i][assigned_event_idx] <= 0:
                 individual_rationality_violations.append(
-                    f"{participant_names[i]} is not individually rational in their assigned {
-                        event_names[assigned_event_idx]}."
+                    f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
                 )
 
             # Check Core Stability
@@ -768,8 +757,7 @@ def view_allocation_new(request):
                             break
                     if can_switch:
                         core_stability_violations.append(
-                            f"{participant_names[i]} and others can jointly benefit by switching to {
-                                event_names[j]}."
+                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
 
                         )
              # Add messages for individual stability violations
@@ -837,8 +825,7 @@ def edit_allocation(request):
             if count > activity.max_participants:
                 messages.warning(
                     request,
-                    f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {
-                        activity.max_participants}. Currently allocated: {count}."
+                    f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {activity.max_participants}. Currently allocated: {count}."
                 )
 
         # Update the participants' activity assignments
@@ -889,8 +876,7 @@ def edit_allocation_new(request):
         for activity_id, count in activity_counts.items():
             activity = Event.objects.get(id=activity_id)
             if count > activity.max_participants:
-                messages.warning(request, f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {
-                                 activity.max_participants}. Currently allocated: {count}.")
+                messages.warning(request, f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {activity.max_participants}. Currently allocated: {count}.")
 
         # Update the participants' activity assignments
         for participant in participants:
@@ -980,15 +966,13 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
         for j in range(a):
             if Preferences[i][j] > Preferences[i][assigned_event] and value(x[i][j]) == 0:
                 individual_stability_violations.append(
-                    f"{participant_names[i]} can improve by switching from  {
-                        event_names[assigned_event]} to  {event_names[j]}."
+                    f"{participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
                 )
 
         # Check Individual Rationality
         if Preferences[i][assigned_event] <= 0:
             individual_rationality_violations.append(
-                f" {participant_names[i]} is not individually rational in their assigned  {
-                    event_names[assigned_event]}."
+                f" {participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
             )
 
         # Check Core Stability
@@ -1001,8 +985,7 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
                         break
                 if can_switch:
                     core_stability_violations.append(
-                        f" {participant_names[i]} and others can jointly benefit by switching to  {
-                            event_names[j]}."
+                        f" {participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
                     )
 
     return (assignments, assigned_activities,
@@ -1161,8 +1144,7 @@ def view_allocation_max(request):
             # Check Individual Rationality
             if Preferences[i][assigned_event_idx] <= 0:
                 individual_rationality_violations.append(
-                    f"{participant_names[i]} is not individually rational in their assigned {
-                        event_names[assigned_event_idx]}."
+                    f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
                 )
 
             # Check Core Stability
@@ -1175,8 +1157,7 @@ def view_allocation_max(request):
                             break
                     if can_switch:
                         core_stability_violations.append(
-                            f"{participant_names[i]} and others can jointly benefit by switching to {
-                                event_names[j]}."
+                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
                         )
 
         return render(request, 'Organizer/max_allocation.html', {
@@ -1214,8 +1195,7 @@ def edit_allocation_max(request):
         for activity_id, count in activity_counts.items():
             activity = Event.objects.get(id=activity_id)
             if count > activity.max_participants:
-                messages.warning(request, f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {
-                                 activity.max_participants}. Currently allocated: {count}.")
+                messages.warning(request, f"Activity '{activity.name}' capacity exceeded. Maximum capacity is {activity.max_participants}. Currently allocated: {count}.")
 
         # Update the participants' activity assignments
         for participant in participants:
