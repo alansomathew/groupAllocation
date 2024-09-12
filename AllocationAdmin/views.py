@@ -365,28 +365,28 @@ def allocate_participants_to_activities(request):
         messages.warning(request, "Not all events have participants.")
 
     # Provide feedback on individual stability
-    if individual_stability_violations:
-        for violation in individual_stability_violations:
-            messages.warning(request, violation)
-        messages.error(request,"The assignment is not individually stable")
-    else:
-        messages.success(request, "The assignment is individually stable.")
+    # if individual_stability_violations:
+    #     for violation in individual_stability_violations:
+    #         messages.warning(request, violation)
+    #     messages.error(request,"The assignment is not individually stable")
+    # else:
+    #     messages.success(request, "The assignment is individually stable.")
 
     # Provide feedback on core stability
-    if core_stability_violations:
-        for violation in core_stability_violations:
-            messages.warning(request, violation)
-        messages.error(request,"The assignment is not core stable")
-    else:
-        messages.success(request, "The assignment is core stable.")
+    # if core_stability_violations:
+    #     for violation in core_stability_violations:
+    #         messages.warning(request, violation)
+    #     messages.error(request,"The assignment is not core stable")
+    # else:
+    #     messages.success(request, "The assignment is core stable.")
 
     # Provide feedback on individual rationality
-    if individual_rationality_violations:
-        for violation in individual_rationality_violations:
-            messages.warning(request, violation)
-        messages.error(request,"The assignment is not individually rational")
-    else:
-        messages.success(request, "The assignment is individually rational.")
+    # if individual_rationality_violations:
+    #     for violation in individual_rationality_violations:
+    #         messages.warning(request, violation)
+    #     messages.error(request,"The assignment is not individually rational")
+    # else:
+    #     messages.success(request, "The assignment is individually rational.")
 
     return redirect('view_allocation')
 
@@ -404,6 +404,12 @@ def view_allocation(request):
 
         # Prepare the list of events for indexing
         events_list = list(events)
+        a = len(events_list)
+        n = len(participants)
+
+        if n == 0 or a == 0:
+            messages.warning(request, "No participants or events available for viewing.")
+            return redirect('home')
 
         # Prepare the Preferences matrix and assignment dictionary
         Preferences = []
@@ -420,9 +426,75 @@ def view_allocation(request):
                 preferences.append(activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
 
-        
+        participant_names = [participant.name for participant in participants]
+        event_names = [event.name for event in events]
 
-        return render(request, 'Organizer/allocation.html', {'participants': participants})
+        # Check individual stability
+        individual_stability_violations = []
+        for i in range(n):
+            if i in assignment_dict:
+                assigned_event = assignment_dict[i]
+                for j in range(a):
+                    if Preferences[i][j] > Preferences[i][assigned_event] and assignment_dict.get(i) != j:
+                        individual_stability_violations.append(
+                            f"{participant_names[i]} can improve by switching from {event_names[assigned_event]} to {event_names[j]}."
+                        )
+
+        # Check core stability
+        core_stability_violations = []
+        for i in range(n):
+            if i in assignment_dict:
+                assigned_event = assignment_dict[i]
+                for j in range(a):
+                    if Preferences[i][j] > Preferences[i][assigned_event] and assignment_dict.get(i) != j:
+                        can_switch = True
+                        for k in range(n):
+                            if assignment_dict.get(k) == j and Preferences[k][assigned_event] > Preferences[k][j]:
+                                can_switch = False
+                                break
+                        if can_switch:
+                            core_stability_violations.append(
+                                f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+                            )
+
+        # Check individual rationality
+        individual_rationality_violations = []
+        for i in range(n):
+            if i in assignment_dict:
+                assigned_event = assignment_dict[i]
+                if Preferences[i][assigned_event] <= 0:
+                    individual_rationality_violations.append(
+                        f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event]}."
+                    )
+
+        # Add messages for individual stability violations
+        if individual_stability_violations:
+            for violation in individual_stability_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not individually stable.")
+        else:
+            messages.success(request, "The assignment is individually stable.")
+
+        # Add messages for core stability violations
+        if core_stability_violations:
+            for violation in core_stability_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not core stable.")
+        else:
+            messages.success(request, "The assignment is core stable.")
+
+        # Add messages for individual rationality violations
+        if individual_rationality_violations:
+            for violation in individual_rationality_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not individually rational.")
+        else:
+            messages.success(request, "The assignment is individually rational.")
+
+        return render(request, 'Organizer/allocation.html', {
+            'participants': participants,
+            'events': events,
+        })
     
     except Exception as e:
         print(e)
@@ -548,34 +620,35 @@ def allocate_participants_new(request):
         messages.warning(request, "Not all events have participants.")
 
     # Provide feedback on individual stability
-    if individual_stability_violations:
-        for violation in individual_stability_violations:
-            messages.warning(request, violation)
+    # if individual_stability_violations:
+    #     for violation in individual_stability_violations:
+    #         messages.warning(request, violation)
 
-        messages.error(request, 'The assignment is not individual stable')
-    else:
-        messages.success(request, "The assignment is individually stable.")
+    #     messages.error(request, 'The assignment is not individual stable')
+    # else:
+    #     messages.success(request, "The assignment is individually stable.")
 
     # Provide feedback on core stability
-    if core_stability_violations:
-        for violation in core_stability_violations:
-            messages.warning(request, violation)
+    # if core_stability_violations:
+    #     for violation in core_stability_violations:
+    #         messages.warning(request, violation)
         
-        messages.error(request,'The assignment is not core stable')
-    else:
-        messages.success(request, "The assignment is core stable.")
+    #     messages.error(request,'The assignment is not core stable')
+    # else:
+    #     messages.success(request, "The assignment is core stable.")
 
     # Provide feedback on individual rationality
-    if individual_rationality_violations:
-        for violation in individual_rationality_violations:
-            messages.warning(request, violation)
+    # if individual_rationality_violations:
+    #     for violation in individual_rationality_violations:
+    #         messages.warning(request, violation)
         
-        messages.error(request, 'The assignment is not individually rational')
-    else:
-        messages.success(request, "The assignment is individually rational.")
+    #     messages.error(request, 'The assignment is not individually rational')
+    # else:
+    #     messages.success(request, "The assignment is individually rational.")
 
     return redirect('view_allocation_new')  
 
+@login_required
 def view_allocation_new(request):
     try:
         # Get the events created by the current user (organizer)
@@ -599,7 +672,7 @@ def view_allocation_new(request):
         assignment_dict = {}
         for idx, participant in enumerate(participants):
             preferences = []
-            assigned_event = participant.assigned_to_new
+            assigned_event = participant.assigned_to_new  # Assuming "assigned_to_new" holds the new assignment
             assigned_event_idx = list(events).index(assigned_event) if assigned_event in events else None
             if assigned_event_idx is not None:
                 assignment_dict[idx] = [assigned_event_idx]
@@ -609,12 +682,58 @@ def view_allocation_new(request):
                 preferences.append(activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
 
-        return render(request, 'Organizer/new_allocation.html', {'participants': participants})
-    
+        # Check for individual stability, core stability, and individual rationality
+        individual_stability_violations = []
+        core_stability_violations = []
+        individual_rationality_violations = []
+
+        participant_names = [p.name for p in participants]
+        event_names = [e.name for e in events]
+
+        for i in range(n):
+            assigned_event_idx = assignment_dict.get(i, [None])[0]
+            if assigned_event_idx is None:
+                continue
+
+            # Check Individual Stability
+            for j in range(a):
+                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                    individual_stability_violations.append(
+                        f"{participant_names[i]} can improve by switching from {event_names[assigned_event_idx]} to {event_names[j]}."
+                    )
+
+            # Check Individual Rationality
+            if Preferences[i][assigned_event_idx] <= 0:
+                individual_rationality_violations.append(
+                    f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
+                )
+
+            # Check Core Stability
+            for j in range(a):
+                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                    can_switch = True
+                    for k in range(n):
+                        if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
+                            can_switch = False
+                            break
+                    if can_switch:
+                        core_stability_violations.append(
+                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+                        )
+
+        return render(request, 'Organizer/new_allocation.html', {
+            'participants': participants,
+            'individual_stability_violations': individual_stability_violations,
+            'core_stability_violations': core_stability_violations,
+            'individual_rationality_violations': individual_rationality_violations,
+        })
+
     except Exception as e:
         print(e)
         messages.error(request, 'Error viewing allocations!')
         return render(request, 'Organizer/new_allocation.html')
+
+
 
 def edit_allocation(request):
     events = Event.objects.filter(is_active=True, created_by=request.user)
@@ -855,28 +974,28 @@ def allocate_activities_max(request):
             messages.warning(request, "Not all events have participants.")
 
         # Provide feedback on individual stability
-        if individual_stability_violations:
-            for violation in individual_stability_violations:
-                messages.warning(request, violation)
-            messages.error(request, "The assignment is not individually stable.")
-        else:
-            messages.success(request, "The assignment is individually stable.")
+        # if individual_stability_violations:
+        #     for violation in individual_stability_violations:
+        #         messages.warning(request, violation)
+        #     messages.error(request, "The assignment is not individually stable.")
+        # else:
+        #     messages.success(request, "The assignment is individually stable.")
 
         # Provide feedback on core stability
-        if core_stability_violations:
-            for violation in core_stability_violations:
-                messages.warning(request, violation)
-            messages.error(request, "The assignment is not core stable.")
-        else:
-            messages.success(request, "The assignment is core stable.")
+        # if core_stability_violations:
+        #     for violation in core_stability_violations:
+        #         messages.warning(request, violation)
+        #     messages.error(request, "The assignment is not core stable.")
+        # else:
+        #     messages.success(request, "The assignment is core stable.")
 
         # Provide feedback on individual rationality
-        if individual_rationality_violations:
-            for violation in individual_rationality_violations:
-                messages.warning(request, violation)
-            messages.error(request, "The assignment is not individually rational.")
-        else:
-            messages.success(request, "The assignment is individually rational.")
+        # if individual_rationality_violations:
+        #     for violation in individual_rationality_violations:
+        #         messages.warning(request, violation)
+        #     messages.error(request, "The assignment is not individually rational.")
+        # else:
+        #     messages.success(request, "The assignment is individually rational.")
 
         return redirect('view_allocation_max')
 
@@ -886,6 +1005,7 @@ def allocate_activities_max(request):
         return redirect('view_allocation_max')
 
     
+@login_required
 @login_required
 def view_allocation_max(request):
     try:
@@ -897,7 +1017,7 @@ def view_allocation_max(request):
             participantactivity__event__in=events
         ).distinct()
 
-                # Get the number of participants and events
+        # Get the number of participants and events
         n = participants.count()
         a = events.count()
 
@@ -910,7 +1030,7 @@ def view_allocation_max(request):
         assignment_dict = {}
         for idx, participant in enumerate(participants):
             preferences = []
-            assigned_event = participant.assigned_to_new
+            assigned_event = participant.assigned_to_max
             assigned_event_idx = list(events).index(assigned_event) if assigned_event in events else None
             if assigned_event_idx is not None:
                 assignment_dict[idx] = [assigned_event_idx]
@@ -920,12 +1040,57 @@ def view_allocation_max(request):
                 preferences.append(activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
 
-        return render(request, 'Organizer/max_allocation.html', {'participants': participants})
+        # Check for individual stability, core stability, and individual rationality
+        individual_stability_violations = []
+        core_stability_violations = []
+        individual_rationality_violations = []
+
+        participant_names = [p.name for p in participants]
+        event_names = [e.name for e in events]
+
+        for i in range(n):
+            assigned_event_idx = assignment_dict.get(i, [None])[0]
+            if assigned_event_idx is None:
+                continue
+
+            # Check Individual Stability
+            for j in range(a):
+                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                    individual_stability_violations.append(
+                        f"{participant_names[i]} can improve by switching from {event_names[assigned_event_idx]} to {event_names[j]}."
+                    )
+
+            # Check Individual Rationality
+            if Preferences[i][assigned_event_idx] <= 0:
+                individual_rationality_violations.append(
+                    f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
+                )
+
+            # Check Core Stability
+            for j in range(a):
+                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                    can_switch = True
+                    for k in range(n):
+                        if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
+                            can_switch = False
+                            break
+                    if can_switch:
+                        core_stability_violations.append(
+                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+                        )
+
+        return render(request, 'Organizer/max_allocation.html', {
+            'participants': participants,
+            'individual_stability_violations': individual_stability_violations,
+            'core_stability_violations': core_stability_violations,
+            'individual_rationality_violations': individual_rationality_violations,
+        })
 
     except Exception as e:
         print(e)
         messages.error(request, 'Error viewing allocations!')
         return render(request, 'Organizer/max_allocation.html')
+
 
 def edit_allocation_max(request):
     event = Event.objects.filter(is_active=True,created_by=request.user)

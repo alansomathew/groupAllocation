@@ -1,6 +1,8 @@
 {% extends 'Organizer/Head.html' %}
 
 {% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
 <br><br><br><br>
 <!DOCTYPE html>
 <html lang="en">
@@ -51,7 +53,7 @@
         <div class="alert  {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
             data-timeout="3000" role="alert">
             {{message}}
-            <button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            {% if message.tags == 'warning' %} <a href="{% url 'edit_allocation_max' %}" class="btn fa-solid fa-plus float-end" ></a> {% else %}<button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button> {% endif %}
         </div>
         {% endfor %}
         {% endif %}
