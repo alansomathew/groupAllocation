@@ -1159,6 +1159,32 @@ def view_allocation_max(request):
                             f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
                         )
 
+        if individual_stability_violations:
+            for violation in individual_stability_violations:
+                messages.warning(request, violation)
+            messages.error(
+                request, "The assignment is not individually stable.")
+        else:
+            messages.success(request, "The assignment is individually stable.")
+
+        # Add messages for core stability violations
+        if core_stability_violations:
+            for violation in core_stability_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not core stable.")
+        else:
+            messages.success(request, "The assignment is core stable.")
+
+        # Add messages for individual rationality violations
+        if individual_rationality_violations:
+            for violation in individual_rationality_violations:
+                messages.warning(request, violation)
+            messages.error(
+                request, "The assignment is not individually rational.")
+        else:
+            messages.success(
+                request, "The assignment is individually rational.")
+
         return render(request, 'Organizer/max_allocation.html', {
             'participants': participants,
             'individual_stability_violations': individual_stability_violations,
