@@ -1137,8 +1137,7 @@ def view_allocation_max(request):
             for j in range(a):
                 if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
                     individual_stability_violations.append(
-                        f"{participant_names[i]} can improve by switching from {
-                            event_names[assigned_event_idx]} to {event_names[j]}."
+                        f"{participant_names[i]} can improve by switching from {event_names[assigned_event_idx]} to {event_names[j]}."
                     )
 
             # Check Individual Rationality
