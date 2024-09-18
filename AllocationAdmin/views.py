@@ -329,8 +329,7 @@ def allocate_participants_to_activities(request):
     a = events.count()
 
     if n == 0 or a == 0:
-        messages.warning(
-            request, "No participants or events available for allocation.")
+        messages.warning(request, "No participants or events available for allocation.")
         return redirect('view_allocation')
 
     min_bounds = list(events.values_list('min_participants', flat=True))
@@ -342,14 +341,23 @@ def allocate_participants_to_activities(request):
 
     for participant in participants:
         preferences = []
-        # Assuming 'name' is the participant's name field
         participant_names.append(participant.name)
         for event in events:
-            activity_preference = ParticipantActivity.objects.filter(
-                participant=participant, event=event).first()
-            preferences.append(
-                activity_preference.preference if activity_preference else 0)
+            activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
+            preferences.append(activity_preference.preference if activity_preference else 0)
         Preferences.append(preferences)
+
+    # Calculate total preferences for each event
+    total_preferences = [0] * a
+    for i in range(n):
+        for j in range(a):
+            total_preferences[j] += Preferences[i][j]
+
+    max_pref_value = max(total_preferences)
+    min_pref_value = min(total_preferences)
+
+    max_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == max_pref_value]
+    min_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == min_pref_value]
 
     # Solve the assignment problem
     assignments, assigned_activities, individual_stability_violations, core_stability_violations, individual_rationality_violations = solve_activity_assignment(
@@ -366,11 +374,9 @@ def allocate_participants_to_activities(request):
 
     # Check if all participants are allocated
     if len(assignments) == n:
-        messages.success(
-            request, "All participants are involved in the allocation.")
+        messages.success(request, "All participants are involved in the allocation.")
     else:
-        messages.warning(
-            request, "Not all participants are involved in the allocation.")
+        messages.warning(request, "Not all participants are involved in the allocation.")
 
     # Check if all events have at least one participant
     if len(assigned_activities) == a:
@@ -382,7 +388,7 @@ def allocate_participants_to_activities(request):
     # if individual_stability_violations:
     #     for violation in individual_stability_violations:
     #         messages.warning(request, violation)
-    #     messages.error(request,"The assignment is not individually stable")
+    #     messages.error(request, "The assignment is not individually stable.")
     # else:
     #     messages.success(request, "The assignment is individually stable.")
 
@@ -390,7 +396,7 @@ def allocate_participants_to_activities(request):
     # if core_stability_violations:
     #     for violation in core_stability_violations:
     #         messages.warning(request, violation)
-    #     messages.error(request,"The assignment is not core stable")
+    #     messages.error(request, "The assignment is not core stable.")
     # else:
     #     messages.success(request, "The assignment is core stable.")
 
@@ -398,9 +404,13 @@ def allocate_participants_to_activities(request):
     # if individual_rationality_violations:
     #     for violation in individual_rationality_violations:
     #         messages.warning(request, violation)
-    #     messages.error(request,"The assignment is not individually rational")
+    #     messages.error(request, "The assignment is not individually rational.")
     # else:
     #     messages.success(request, "The assignment is individually rational.")
+
+    # Display Most and Least Interested Activities
+    messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
+    messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
 
     return redirect('view_allocation')
 
@@ -613,18 +623,39 @@ def allocate_participants_new(request):
     n = participants.count()
     a = events.count()
 
+    if n == 0 or a == 0:
+        messages.warning(request, "No participants or events available for allocation.")
+        return redirect('view_allocation_new')
+
     min_bounds = list(events.values_list('min_participants', flat=True))
     max_bounds = list(events.values_list('max_participants', flat=True))
 
     Preferences = []
+    participant_names = []
+    event_names = list(events.values_list('name', flat=True))
+
     for participant in participants:
         preferences = []
+        participant_names.append(participant.name)
         for event in events:
             activity_preference = ParticipantActivity.objects.filter(
                 participant=participant, event=event).first()
             preferences.append(
                 activity_preference.preference if activity_preference else 0)
         Preferences.append(preferences)
+
+    # Calculate total preferences for each event
+    total_preferences = [0] * a
+    for i in range(n):
+        for j in range(a):
+            total_preferences[j] += Preferences[i][j]
+
+    # Find the most and least interested activities
+    max_pref_value = max(total_preferences)
+    min_pref_value = min(total_preferences)
+
+    max_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == max_pref_value]
+    min_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == min_pref_value]
 
     (assignments, assigned_activities,
      individual_stability_violations, core_stability_violations,
@@ -641,11 +672,9 @@ def allocate_participants_new(request):
 
     # Check if all participants are allocated
     if len(assignments) == n:
-        messages.success(
-            request, "All participants are involved in the allocation.")
+        messages.success(request, "All participants are involved in the allocation.")
     else:
-        messages.warning(
-            request, "Not all participants are involved in the allocation.")
+        messages.warning(request, "Not all participants are involved in the allocation.")
 
     # Check if all events have at least one participant
     if len(assigned_activities) == a:
@@ -657,8 +686,7 @@ def allocate_participants_new(request):
     # if individual_stability_violations:
     #     for violation in individual_stability_violations:
     #         messages.warning(request, violation)
-
-    #     messages.error(request, 'The assignment is not individual stable')
+    #     messages.error(request, 'The assignment is not individually stable.')
     # else:
     #     messages.success(request, "The assignment is individually stable.")
 
@@ -666,8 +694,7 @@ def allocate_participants_new(request):
     # if core_stability_violations:
     #     for violation in core_stability_violations:
     #         messages.warning(request, violation)
-
-    #     messages.error(request,'The assignment is not core stable')
+    #     messages.error(request, 'The assignment is not core stable.')
     # else:
     #     messages.success(request, "The assignment is core stable.")
 
@@ -675,10 +702,13 @@ def allocate_participants_new(request):
     # if individual_rationality_violations:
     #     for violation in individual_rationality_violations:
     #         messages.warning(request, violation)
-
-    #     messages.error(request, 'The assignment is not individually rational')
+    #     messages.error(request, 'The assignment is not individually rational.')
     # else:
     #     messages.success(request, "The assignment is individually rational.")
+
+    # Display Most and Least Interested Activities
+    messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
+    messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
 
     return redirect('view_allocation_new')
 
@@ -1007,18 +1037,39 @@ def allocate_activities_max(request):
         # Prepare data for optimization
         n = participants.count()
         a = events.count()
+        if n == 0 or a == 0:
+            messages.warning(request, "No participants or events available for allocation.")
+            return redirect('view_allocation_max')
+
         min_bounds = list(events.values_list('min_participants', flat=True))
         max_bounds = list(events.values_list('max_participants', flat=True))
 
         Preferences = []
+        participant_names = []
+        event_names = list(events.values_list('name', flat=True))
+
         for participant in participants:
             preferences = []
+            participant_names.append(participant.name)
             for event in events:
                 activity_preference = ParticipantActivity.objects.filter(
                     participant=participant, event=event).first()
                 preferences.append(
                     activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
+
+        # Calculate total preferences for each event
+        total_preferences = [0] * a
+        for i in range(n):
+            for j in range(a):
+                total_preferences[j] += Preferences[i][j]
+
+        # Find the most and least interested activities
+        max_pref_value = max(total_preferences)
+        min_pref_value = min(total_preferences)
+
+        max_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == max_pref_value]
+        min_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == min_pref_value]
 
         # Solve the assignment problem
         (assignments, assigned_activities,
@@ -1049,6 +1100,10 @@ def allocate_activities_max(request):
                 request, "All events have at least one participant.")
         else:
             messages.warning(request, "Not all events have participants.")
+
+        # Display Most Interested Activity and Least Interested Activity
+        messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
+        messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
 
         # Provide feedback on individual stability
         # if individual_stability_violations:
@@ -1082,7 +1137,6 @@ def allocate_activities_max(request):
         return redirect('view_allocation_max')
 
 
-@login_required
 @login_required
 def view_allocation_max(request):
     try:
