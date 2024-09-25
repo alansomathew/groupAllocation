@@ -982,33 +982,26 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
     prob = LpProblem("ActivityAssignment", LpMaximize)
 
     # Decision variables
-    # x[i][j] = 1 if participant i is assigned to activity j
-    x = LpVariable.dicts("x", (range(n), range(a)), cat=LpBinary)
-    # y[j] = 1 if activity j is assigned
-    y = LpVariable.dicts("y", range(a), cat=LpBinary)
+    x = LpVariable.dicts("x", (range(n), range(a)), cat=LpBinary)  # x[i][j] = 1 if participant i is assigned to activity j
+    y = LpVariable.dicts("y", range(a), cat=LpBinary)  # y[j] = 1 if activity j is assigned
 
     # Objective function: Maximize total preference sum
-    prob += lpSum(Preferences[i][j] * x[i][j] for i in range(n)
-                  for j in range(a)), "TotalPreferenceSum"
+    prob += lpSum(Preferences[i][j] * x[i][j] for i in range(n) for j in range(a)), "TotalPreferenceSum"
 
     # Constraints
 
     # Each participant can be assigned to at most one activity
     for i in range(n):
-        prob += lpSum(x[i][j]
-                      for j in range(a)) <= 1, f"Participant_{i}_Assignment"
+        prob += lpSum(x[i][j] for j in range(a)) <= 1, f"Participant_{i}_Assignment"
 
     # Ensure each activity j has the correct number of participants assigned within bounds
     for j in range(a):
-        prob += min_bounds[j] * y[j] <= lpSum(x[i][j]
-                                              for i in range(n)), f"Min_Participants_Activity_{j}"
-        prob += lpSum(x[i][j] for i in range(n)) <= max_bounds[j] * \
-            y[j], f"Max_Participants_Activity_{j}"
+        prob += min_bounds[j] * y[j] <= lpSum(x[i][j] for i in range(n)), f"Min_Participants_Activity_{j}"
+        prob += lpSum(x[i][j] for i in range(n)) <= max_bounds[j] * y[j], f"Max_Participants_Activity_{j}"
 
     # Ensure correct values for assigned activities
     for j in range(a):
-        prob += lpSum(x[i][j]
-                      for i in range(n)) >= y[j], f"Activity_{j}_Activation"
+        prob += lpSum(x[i][j] for i in range(n)) >= y[j], f"Activity_{j}_Activation"
 
     # Solve the problem
     prob.solve()
