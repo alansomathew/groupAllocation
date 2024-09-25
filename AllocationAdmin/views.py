@@ -409,8 +409,8 @@ def allocate_participants_to_activities(request):
     #     messages.success(request, "The assignment is individually rational.")
 
     # Display Most and Least Interested Activities
-    messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
-    messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
+    # messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
+    # messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
 
     return redirect('view_allocation')
 
@@ -707,8 +707,8 @@ def allocate_participants_new(request):
     #     messages.success(request, "The assignment is individually rational.")
 
     # Display Most and Least Interested Activities
-    messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
-    messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
+    # messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
+    # messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
 
     return redirect('view_allocation_new')
 
@@ -832,13 +832,13 @@ def view_allocation_new(request):
 
 def edit_allocation(request):
     events = Event.objects.filter(is_active=True, created_by=request.user)
-    participants = Participant.objects.filter(
-        participantactivity__event__in=events).distinct()
+    participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
+
+    new_allocations = {}  # Dictionary to store the new allocations
+    activity_counts = {activity.id: 0 for activity in events}  # Track the number of participants assigned to each activity
 
     if request.method == 'POST':
-        new_allocations = {}
-        activity_counts = {activity.id: 0 for activity in events}
-
+        # Process the form submission for new allocations
         for participant in participants:
             activity_id = request.POST.get(f'activity_{participant.id}')
             if activity_id:
@@ -868,14 +868,36 @@ def edit_allocation(request):
                 participant.assigned_to = None
             participant.save()
 
-        # Update the `is_updated` flag for all events involved
-
+        # Update the `is_updated` flag for the user
         user = request.user
         user.is_updated = True
         user.save()
 
         messages.success(request, "Allocation updated successfully.")
         return redirect('view_allocation')
+
+    # Check individual stability for each participant's current and new allocation
+    individual_stability_violations = []
+    for participant in participants:
+        current_event = participant.assigned_to
+        participant_preferences = ParticipantActivity.objects.filter(participant=participant)
+
+        # Get the current preferred activity (if any)
+        preferred_event = max(participant_preferences, key=lambda x: x.preference, default=None)
+
+        # Check if switching would result in a better preference
+        if preferred_event and current_event != preferred_event.event:
+            if preferred_event.preference > participant_preferences.filter(event=current_event).first().preference:
+                individual_stability_violations.append(
+                    f"Participant {participant.name} can improve by switching from {current_event.name if current_event else 'None'} to {preferred_event.event.name}."
+                )
+
+    # print(individual_stability_violations)
+
+    if individual_stability_violations:
+        for violation in individual_stability_violations:
+            print(violation)
+            messages.warning(request, violation)
 
     context = {
         'events': events,
@@ -886,12 +908,13 @@ def edit_allocation(request):
 
 def edit_allocation_new(request):
     event = Event.objects.filter(is_active=True, created_by=request.user)
-    participants = Participant.objects.filter(
-        participantactivity__event__in=event).distinct()
-    if request.method == 'POST':
-        new_allocations = {}
-        activity_counts = {activity.id: 0 for activity in event}
+    participants = Participant.objects.filter(participantactivity__event__in=event).distinct()
+    
+    new_allocations = {}  # Dictionary to store new allocations
+    activity_counts = {activity.id: 0 for activity in event}  # Track how many participants are assigned to each event
 
+    if request.method == 'POST':
+        # Process the form submission for new allocations
         for participant in participants:
             activity_id = request.POST.get(f'activity_{participant.id}')
             if activity_id:
@@ -923,7 +946,27 @@ def edit_allocation_new(request):
         user.save()
 
         messages.success(request, "Allocation updated successfully.")
-        return redirect('view_allocation_new',)
+        return redirect('view_allocation_new')
+
+    # Individual Stability Check (before saving any updates)
+    individual_stability_violations = []
+    for participant in participants:
+        current_event = participant.assigned_to_new
+        participant_preferences = ParticipantActivity.objects.filter(participant=participant)
+
+        # Get the current preferred event (if any)
+        preferred_event = max(participant_preferences, key=lambda x: x.preference, default=None)
+
+        # Check if switching would result in a better preference
+        if preferred_event and current_event != preferred_event.event:
+            if preferred_event.preference > participant_preferences.filter(event=current_event).first().preference:
+                individual_stability_violations.append(
+                    f"Participant {participant.name} can improve by switching from {current_event.name if current_event else 'None'} to {preferred_event.event.name}."
+                )
+
+    if individual_stability_violations:
+        for violation in individual_stability_violations:
+            messages.warning(request, violation)
 
     context = {
         'event': event,
@@ -931,6 +974,7 @@ def edit_allocation_new(request):
         'participants': participants,
     }
     return render(request, 'Organizer/modify_allocation.html', context)
+
 
 
 def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, participants, events):
@@ -1256,10 +1300,12 @@ def edit_allocation_max(request):
     event = Event.objects.filter(is_active=True, created_by=request.user)
     participants = Participant.objects.filter(
         participantactivity__event__in=event).distinct()
-    if request.method == 'POST':
-        new_allocations = {}
-        activity_counts = {activity.id: 0 for activity in event}
+    
+    new_allocations = {}  # Dictionary to store new allocations
+    activity_counts = {activity.id: 0 for activity in event}  # Track how many participants are assigned to each event
 
+    if request.method == 'POST':
+        # Process the form submission for new allocations
         for participant in participants:
             activity_id = request.POST.get(f'activity_{participant.id}')
             if activity_id:
@@ -1291,7 +1337,28 @@ def edit_allocation_max(request):
         user.save()
 
         messages.success(request, "Allocation updated successfully.")
-        return redirect('view_allocation_max',)
+        return redirect('view_allocation_max')
+
+    # Individual Stability Check (before saving any updates)
+    individual_stability_violations = []
+    for participant in participants:
+        current_event = participant.assigned_to_max
+        participant_preferences = ParticipantActivity.objects.filter(participant=participant)
+
+        # Get the current preferred event (if any)
+        preferred_event = max(participant_preferences, key=lambda x: x.preference, default=None)
+
+        # Check if switching would result in a better preference
+        if preferred_event and current_event != preferred_event.event:
+            if preferred_event.preference > participant_preferences.filter(event=current_event).first().preference:
+                individual_stability_violations.append(
+                    f"Participant {participant.name} can improve by switching from {current_event.name if current_event else 'None'} to {preferred_event.event.name}."
+                )
+
+    # Display warnings if individual stability is violated
+    if individual_stability_violations:
+        for violation in individual_stability_violations:
+            messages.warning(request, violation)
 
     context = {
         'event': event,
@@ -1299,3 +1366,4 @@ def edit_allocation_max(request):
         'participants': participants,
     }
     return render(request, 'Organizer/modify_allocation_max.html', context)
+

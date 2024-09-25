@@ -9,6 +9,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Participant Allocation</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 </head>
 
 <body>
@@ -48,6 +49,16 @@
                 <button type="submit" class="btn btn-outline-primary">Update Allocation</button>
             </div>
         </form>
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert  {% if message.tags == 'success' %} alert-success {% elif message.tags == 'error' %} alert-danger {% elif message.tags == 'warning' %} alert-warning {% endif %} alert-dismissible fade show"
+            data-timeout="3000" role="alert">
+            {{message}}
+            {% if message.tags == 'warning' %} <a href="{% url 'edit_allocation' %}" class="btn fa-solid fa-plus float-end" ></a> {% else %}<button type="button" class="btn btn-close" data-bs-dismiss="alert" aria-label="Close"></button> {% endif %}
+        </div>
+        {% endfor %}
+        {% endif %}
     </div>
 </body>
 
