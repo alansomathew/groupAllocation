@@ -1095,18 +1095,7 @@ def allocate_activities_max(request):
                     activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
 
-        # Calculate total preferences for each event
-        total_preferences = [0] * a
-        for i in range(n):
-            for j in range(a):
-                total_preferences[j] += Preferences[i][j]
-
-        # Find the most and least interested activities
-        max_pref_value = max(total_preferences)
-        min_pref_value = min(total_preferences)
-
-        max_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == max_pref_value]
-        min_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == min_pref_value]
+        
 
         # Solve the assignment problem
         (assignments, assigned_activities,
@@ -1122,6 +1111,19 @@ def allocate_activities_max(request):
                 event = events[event_idx]
                 participant.assigned_to_max = event
                 participant.save()
+
+        # Calculate total preferences for each event
+        total_preferences = [0] * a
+        for i in range(n):
+            for j in range(a):
+                total_preferences[j] += Preferences[i][j]
+
+        # Find the most and least interested activities
+        max_pref_value = max(total_preferences)
+        min_pref_value = min(total_preferences)
+
+        max_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == max_pref_value]
+        min_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == min_pref_value]
 
         # Check if all participants are allocated
         if len(assignments) == n:
