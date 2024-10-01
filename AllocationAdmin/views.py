@@ -982,26 +982,33 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
     prob = LpProblem("ActivityAssignment", LpMaximize)
 
     # Decision variables
-    x = LpVariable.dicts("x", (range(n), range(a)), cat=LpBinary)  # x[i][j] = 1 if participant i is assigned to activity j
-    y = LpVariable.dicts("y", range(a), cat=LpBinary)  # y[j] = 1 if activity j is assigned
+    # x[i][j] = 1 if participant i is assigned to activity j
+    x = LpVariable.dicts("x", (range(n), range(a)), cat=LpBinary)
+    # y[j] = 1 if activity j is assigned
+    y = LpVariable.dicts("y", range(a), cat=LpBinary)
 
     # Objective function: Maximize total preference sum
-    prob += lpSum(Preferences[i][j] * x[i][j] for i in range(n) for j in range(a)), "TotalPreferenceSum"
+    prob += lpSum(Preferences[i][j] * x[i][j] for i in range(n)
+                  for j in range(a)), "TotalPreferenceSum"
 
     # Constraints
 
     # Each participant can be assigned to at most one activity
     for i in range(n):
-        prob += lpSum(x[i][j] for j in range(a)) <= 1, f"Participant_{i}_Assignment"
+        prob += lpSum(x[i][j]
+                      for j in range(a)) <= 1, f"Participant_{i}_Assignment"
 
     # Ensure each activity j has the correct number of participants assigned within bounds
     for j in range(a):
-        prob += min_bounds[j] * y[j] <= lpSum(x[i][j] for i in range(n)), f"Min_Participants_Activity_{j}"
-        prob += lpSum(x[i][j] for i in range(n)) <= max_bounds[j] * y[j], f"Max_Participants_Activity_{j}"
+        prob += min_bounds[j] * y[j] <= lpSum(x[i][j]
+                                              for i in range(n)), f"Min_Participants_Activity_{j}"
+        prob += lpSum(x[i][j] for i in range(n)) <= max_bounds[j] * \
+            y[j], f"Max_Participants_Activity_{j}"
 
     # Ensure correct values for assigned activities
     for j in range(a):
-        prob += lpSum(x[i][j] for i in range(n)) >= y[j], f"Activity_{j}_Activation"
+        prob += lpSum(x[i][j]
+                      for i in range(n)) >= y[j], f"Activity_{j}_Activation"
 
     # Solve the problem
     prob.solve()
@@ -1141,8 +1148,8 @@ def allocate_activities_max(request):
             messages.warning(request, "Not all events have participants.")
 
         # Display Most Interested Activity and Least Interested Activity
-        messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
-        messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
+        messages.info(request, f"Activity assigned with highest pref. Value: {', '.join(max_pref_events)}")
+        messages.info(request, f"Activity assigned with lowest pref. Value: {', '.join(min_pref_events)}")
 
         # Provide feedback on individual stability
         # if individual_stability_violations:
