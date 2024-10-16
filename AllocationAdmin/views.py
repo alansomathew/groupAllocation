@@ -439,6 +439,8 @@ def view_allocation(request):
         # Prepare the Preferences matrix and assignment dictionary
         Preferences = []
         assignment_dict = {}
+        assignments = []  # Storing current assignments
+
         for idx, participant in enumerate(participants):
             preferences = []
             # Assuming 'assigned_to' holds the current assignment
@@ -447,6 +449,7 @@ def view_allocation(request):
                 assigned_event) if assigned_event in events_list else None
             if assigned_event_idx is not None:
                 assignment_dict[idx] = assigned_event_idx
+                assignments.append((idx, assigned_event_idx))  # Add current assignments
 
             for event in events_list:
                 activity_preference = ParticipantActivity.objects.filter(
@@ -469,22 +472,19 @@ def view_allocation(request):
                             f"{participant_names[i]} can improve by switching from {event_names[assigned_event]} to {event_names[j]}."
                         )
 
-        # Check core stability
-        core_stability_violations = []
-        for i in range(n):
-            if i in assignment_dict:
-                assigned_event = assignment_dict[i]
-                for j in range(a):
-                    if Preferences[i][j] > Preferences[i][assigned_event] and assignment_dict.get(i) != j:
-                        can_switch = True
-                        for k in range(n):
-                            if assignment_dict.get(k) == j and Preferences[k][assigned_event] > Preferences[k][j]:
-                                can_switch = False
-                                break
-                        if can_switch:
-                            core_stability_violations.append(
-                                f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
-                            )
+        # Core stability check using the core_stability_check function
+        min_bounds = list(events.values_list('min_participants', flat=True))
+        max_bounds = list(events.values_list('max_participants', flat=True))
+        core_stability_violations = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
+
+        # Format core stability messages
+        if core_stability_violations:
+            for assignment in core_stability_violations:
+                i, j = assignment  # Participant index and new assigned event index
+                messages.warning(request, f"{participant_names[i]} can benefit from switching to {event_names[j]}.")
+            messages.error(request, "The assignment is not core stable.")
+        else:
+            messages.success(request, "The assignment is core stable.")
 
         # Check individual rationality
         individual_rationality_violations = []
@@ -504,14 +504,6 @@ def view_allocation(request):
                 request, "The assignment is not individually stable.")
         else:
             messages.success(request, "The assignment is individually stable.")
-
-        # Add messages for core stability violations
-        if core_stability_violations:
-            for violation in core_stability_violations:
-                messages.warning(request, violation)
-            messages.error(request, "The assignment is not core stable.")
-        else:
-            messages.success(request, "The assignment is core stable.")
 
         # Add messages for individual rationality violations
         if individual_rationality_violations:
@@ -533,6 +525,57 @@ def view_allocation(request):
         messages.error(request, 'Error viewing allocations!')
         return render(request, 'Organizer/allocation.html')
 
+
+def core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds):
+    """
+    Core Stability Check
+    """
+    Ra = {j: set() for j in range(a)}  # Set of reassignable participants per activity
+    N_prime = set()  # Processed participants
+    
+    # While there are unprocessed participants
+    while N_prime != set(range(n)):
+        i = min(set(range(n)) - N_prime)  # Find the first unprocessed participant
+        current_activity = assignments[i][1]
+        
+        # Set of activities more preferred than the current one
+        D = {b for b in range(a) if Preferences[i][b] > Preferences[i][current_activity]}
+        
+        while D:
+            b = D.pop()  # Take a more preferred activity
+            B = {j for j in range(n) if Preferences[j][b] > Preferences[j][assignments[j][1]]}  # All participants who prefer activity b more
+            
+            for c in range(a):
+                if c == b:
+                    continue
+                
+                Rc = set()  # Reassignable participants in activity c
+                for h in range(1, len([j for j in assignments if assignments[j][1] == c and j in B]) + 1):
+                    current_count = len([j for j in assignments if assignments[j][1] == c])
+                    if min_bounds[c] <= current_count - h <= max_bounds[c]:
+                        Rc.add(h)
+                
+                Ra[c] = Rc
+            
+            # Apply reassignment if Ra is empty for current activity
+            if not Ra[current_activity]:
+                feasible_assignment_found = False
+                for ha in Ra:
+                    if min_bounds[b] <= len([j for j in assignments if assignments[j][1] == b]) + ha <= max_bounds[b]:
+                        feasible_assignment_found = True
+                        break
+                
+                if feasible_assignment_found:
+                    assignments[i] = (i, b)  # Reassign participant i to activity b
+                    N_prime = set()  # Reset processed participants
+                    break
+                else:
+                    D = set()  # Skip this participant
+            
+        N_prime.add(i)  # Mark participant as processed
+    
+    print("Core stability check completed.")
+    return assignments
 
 def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, participants, events):
     model = LpProblem("ActivityAssignment", LpMaximize)
@@ -728,6 +771,11 @@ def view_allocation_new(request):
         n = participants.count()
         a = events.count()
 
+        if n == 0 or a == 0:
+            messages.warning(
+                request, "No participants or events available for viewing.")
+            return redirect('home')
+
         # Get the min and max bounds for events
         min_bounds = list(events.values_list('min_participants', flat=True))
         max_bounds = list(events.values_list('max_participants', flat=True))
@@ -735,6 +783,8 @@ def view_allocation_new(request):
         # Prepare the Preferences matrix and assignment dictionary
         Preferences = []
         assignment_dict = {}
+        assignments = []  # Store current assignments
+
         for idx, participant in enumerate(participants):
             preferences = []
             # Assuming "assigned_to_new" holds the new assignment
@@ -743,6 +793,7 @@ def view_allocation_new(request):
                 assigned_event) if assigned_event in events else None
             if assigned_event_idx is not None:
                 assignment_dict[idx] = [assigned_event_idx]
+                assignments.append((idx, assigned_event_idx))  # Add current assignment
 
             for event in events:
                 activity_preference = ParticipantActivity.objects.filter(
@@ -753,9 +804,7 @@ def view_allocation_new(request):
 
         # Check for individual stability, core stability, and individual rationality
         individual_stability_violations = []
-        core_stability_violations = []
         individual_rationality_violations = []
-
         participant_names = [p.name for p in participants]
         event_names = [e.name for e in events]
 
@@ -777,20 +826,16 @@ def view_allocation_new(request):
                     f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
                 )
 
-            # Check Core Stability
-            for j in range(a):
-                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
-                    can_switch = True
-                    for k in range(n):
-                        if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
-                            can_switch = False
-                            break
-                    if can_switch:
-                        core_stability_violations.append(
-                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+        # Core stability check using the core_stability_check function
+        core_stability_results = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
 
-                        )
-             # Add messages for individual stability violations
+        core_stability_violations = []
+        for i, j in core_stability_results:
+            core_stability_violations.append(
+                f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+            )
+
+        # Add messages for individual stability violations
         if individual_stability_violations:
             for violation in individual_stability_violations:
                 messages.warning(request, violation)
@@ -1205,13 +1250,17 @@ def view_allocation_max(request):
         # Prepare the Preferences matrix and assignment dictionary
         Preferences = []
         assignment_dict = {}
+        assignments = []  # Store current assignments
+
         for idx, participant in enumerate(participants):
             preferences = []
+            # Assuming "assigned_to_max" holds the new assignment
             assigned_event = participant.assigned_to_max
             assigned_event_idx = list(events).index(
                 assigned_event) if assigned_event in events else None
             if assigned_event_idx is not None:
-                assignment_dict[idx] = [assigned_event_idx]
+                assignment_dict[idx] = assigned_event_idx
+                assignments.append((idx, assigned_event_idx))  # Add current assignment
 
             for event in events:
                 activity_preference = ParticipantActivity.objects.filter(
@@ -1228,8 +1277,9 @@ def view_allocation_max(request):
         participant_names = [p.name for p in participants]
         event_names = [e.name for e in events]
 
+        # Check individual stability and individual rationality
         for i in range(n):
-            assigned_event_idx = assignment_dict.get(i, [None])[0]
+            assigned_event_idx = assignment_dict.get(i, None)
             if assigned_event_idx is None:
                 continue
 
@@ -1246,19 +1296,16 @@ def view_allocation_max(request):
                     f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
                 )
 
-            # Check Core Stability
-            for j in range(a):
-                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
-                    can_switch = True
-                    for k in range(n):
-                        if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
-                            can_switch = False
-                            break
-                    if can_switch:
-                        core_stability_violations.append(
-                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
-                        )
+        # Core stability check using the core_stability_check function
+        core_stability_results = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
 
+        # core_stability_violations = []
+        # for i, j in core_stability_results:
+        #     core_stability_violations.append(
+        #         f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+        #     )
+
+        # Add messages for individual stability violations
         if individual_stability_violations:
             for violation in individual_stability_violations:
                 messages.warning(request, violation)
@@ -1269,8 +1316,8 @@ def view_allocation_max(request):
 
         # Add messages for core stability violations
         if core_stability_violations:
-            for violation in core_stability_violations:
-                messages.warning(request, violation)
+            # for violation in core_stability_violations:
+            #     messages.warning(request, violation)
             messages.error(request, "The assignment is not core stable.")
         else:
             messages.success(request, "The assignment is core stable.")
