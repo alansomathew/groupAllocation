@@ -827,13 +827,28 @@ def view_allocation_new(request):
                 )
 
         # Core stability check using the core_stability_check function
-        core_stability_results = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
+        # core_stability_results = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
 
         core_stability_violations = []
-        for i, j in core_stability_results:
-            core_stability_violations.append(
-                f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
-            )
+        # for i, j in core_stability_results:
+        #     core_stability_violations.append(
+        #         f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+        #     )
+
+        # Check Core Stability
+        for j in range(a):
+            if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                can_switch = True
+                for k in range(n):
+                    if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
+                        can_switch = False
+                        break
+                if can_switch:
+                    core_stability_violations.append(
+                        f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+
+                    )
+            # Add messages for individual stability violations
 
         # Add messages for individual stability violations
         if individual_stability_violations:
@@ -865,7 +880,7 @@ def view_allocation_new(request):
         return render(request, 'Organizer/new_allocation.html', {
             'participants': participants,
             'individual_stability_violations': individual_stability_violations,
-            'core_stability_violations': core_stability_violations,
+            # 'core_stability_violations': core_stability_violations,
             'individual_rationality_violations': individual_rationality_violations,
         })
 
