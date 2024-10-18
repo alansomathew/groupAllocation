@@ -475,16 +475,22 @@ def view_allocation(request):
         # Core stability check using the core_stability_check function
         min_bounds = list(events.values_list('min_participants', flat=True))
         max_bounds = list(events.values_list('max_participants', flat=True))
-        core_stability_violations = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
+        # core_stability_violations = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
+        core_stability_violations=[]
 
         # Format core stability messages
-        if core_stability_violations:
-            for assignment in core_stability_violations:
-                i, j = assignment  # Participant index and new assigned event index
-                messages.warning(request, f"{participant_names[i]} can benefit from switching to {event_names[j]}.")
-            messages.error(request, "The assignment is not core stable.")
-        else:
-            messages.success(request, "The assignment is core stable.")
+        for j in range(a):
+            if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                can_switch = True
+                for k in range(n):
+                    if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
+                        can_switch = False
+                        break
+                if can_switch:
+                    core_stability_violations.append(
+                        f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+
+                    )
 
         # Check individual rationality
         individual_rationality_violations = []
