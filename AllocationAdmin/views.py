@@ -475,22 +475,23 @@ def view_allocation(request):
         # Core stability check using the core_stability_check function
         min_bounds = list(events.values_list('min_participants', flat=True))
         max_bounds = list(events.values_list('max_participants', flat=True))
-        # core_stability_violations = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
-        core_stability_violations=[]
+        core_stability_violations = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
+        # core_stability_violations=[]
 
         # Format core stability messages
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
-                can_switch = True
-                for k in range(n):
-                    if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
-                        can_switch = False
-                        break
-                if can_switch:
-                    core_stability_violations.append(
-                        f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+        # for j in range(a):
+        #     if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+        #         can_switch = True
+        #         for k in range(n):
+        #             if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
+        #                 can_switch = False
+        #                 break
+        #         if can_switch:
+        #             core_stability_violations.append(
+        #                 f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
 
-                    )
+        #             )
+
 
         # Check individual rationality
         individual_rationality_violations = []
@@ -500,6 +501,8 @@ def view_allocation(request):
                 if Preferences[i][assigned_event] <= 0:
                     individual_rationality_violations.append(
                         f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event]}."
+
+                
                     )
 
         # Add messages for individual stability violations
@@ -510,6 +513,13 @@ def view_allocation(request):
                 request, "The assignment is not individually stable.")
         else:
             messages.success(request, "The assignment is individually stable.")
+        
+        if core_stability_violations:
+            # for violation in core_stability_violations:
+            #     messages.warning(request, violation)
+            messages.error(request, "The assignment is not core stable.")
+        else:
+            messages.success(request, "The assignment is core stable.")
 
         # Add messages for individual rationality violations
         if individual_rationality_violations:
