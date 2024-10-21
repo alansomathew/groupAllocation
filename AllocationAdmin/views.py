@@ -475,22 +475,35 @@ def view_allocation(request):
         # Core stability check using the core_stability_check function
         min_bounds = list(events.values_list('min_participants', flat=True))
         max_bounds = list(events.values_list('max_participants', flat=True))
-        core_stability_violations = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
-        # core_stability_violations=[]
+        # print(f"Assignment Dict: {assignment_dict}")
+        # print(f"Preferences: {Preferences}")
+        #         assignments, core_stability_violations = core_stability_check(
+        #     n, a, assignment_dict, Preferences, min_bounds, max_bounds
+        # )
+        #         print(core_stability_violations)
+        core_stability_violations=[]
 
-        # Format core stability messages
-        # for j in range(a):
-        #     if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
-        #         can_switch = True
-        #         for k in range(n):
-        #             if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
-        #                 can_switch = False
-        #                 break
-        #         if can_switch:
-        #             core_stability_violations.append(
-        #                 f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+        #         assignments, core_stability_violations = core_stability_check(
+        #     n, a, assignment_dict, Preferences, min_bounds, max_bounds
+        # )
+        # for i, j in core_stability_results:
+        #     core_stability_violations.append(
+        #         f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+        #     )
 
-        #             )
+        # Check Core Stability
+        for j in range(a):
+            if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                can_switch = True
+                for k in range(n):
+                    if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
+                        can_switch = False
+                        break
+                if can_switch:
+                    core_stability_violations.append(
+                        f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+
+                    )
 
 
         # Check individual rationality
@@ -515,8 +528,8 @@ def view_allocation(request):
             messages.success(request, "The assignment is individually stable.")
         
         if core_stability_violations:
-            # for violation in core_stability_violations:
-            #     messages.warning(request, violation)
+            for violation in core_stability_violations:
+                messages.warning(request, violation)
             messages.error(request, "The assignment is not core stable.")
         else:
             messages.success(request, "The assignment is core stable.")
@@ -542,56 +555,163 @@ def view_allocation(request):
         return render(request, 'Organizer/allocation.html')
 
 
-def core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds):
+def core_stability_check(n, a, assignments, preferences, min_bounds, max_bounds):
     """
-    Core Stability Check
+    Core Stability Check using MCSSP to determine feasible reassignments.
+    Only return assignments that do not match the current stable assignments.
+    n: Number of participants
+    a: Number of activities
+    assignments: Current assignment of participants (dict of participant -> activity index)
+    preferences: List of preferences for each participant (list of list)
+    min_bounds: Minimum number of participants allowed per activity
+    max_bounds: Maximum number of participants allowed per activity
     """
-    Ra = {j: set() for j in range(a)}  # Set of reassignable participants per activity
-    N_prime = set()  # Processed participants
-    
-    # While there are unprocessed participants
-    while N_prime != set(range(n)):
-        i = min(set(range(n)) - N_prime)  # Find the first unprocessed participant
-        current_activity = assignments[i][1]
-        
-        # Set of activities more preferred than the current one
-        D = {b for b in range(a) if Preferences[i][b] > Preferences[i][current_activity]}
-        
-        while D:
-            b = D.pop()  # Take a more preferred activity
-            B = {j for j in range(n) if Preferences[j][b] > Preferences[j][assignments[j][1]]}  # All participants who prefer activity b more
-            
-            for c in range(a):
-                if c == b:
-                    continue
-                
-                Rc = set()  # Reassignable participants in activity c
-                for h in range(1, len([j for j in assignments if assignments[j][1] == c and j in B]) + 1):
-                    current_count = len([j for j in assignments if assignments[j][1] == c])
-                    if min_bounds[c] <= current_count - h <= max_bounds[c]:
-                        Rc.add(h)
-                
-                Ra[c] = Rc
-            
-            # Apply reassignment if Ra is empty for current activity
-            if not Ra[current_activity]:
-                feasible_assignment_found = False
-                for ha in Ra:
-                    if min_bounds[b] <= len([j for j in assignments if assignments[j][1] == b]) + ha <= max_bounds[b]:
-                        feasible_assignment_found = True
-                        break
-                
-                if feasible_assignment_found:
-                    assignments[i] = (i, b)  # Reassign participant i to activity b
-                    N_prime = set()  # Reset processed participants
+
+    def find_b_Wbar_r(weights, c):
+        """Determine the breakpoint 'b', total weight 'Wbar', and maximum weight 'r'."""
+        try:
+            k = len(weights)
+            b = 1
+            print(f"Starting find_b_Wbar_r: weights={weights}, c={c}, number of groups={k}")
+
+            while True:
+                if b > k:  # Check if 'b' is out of bounds
+                    raise IndexError(f"Attempted to access non-existent index in 'weights'. b={b}, len(weights)={k}")
+
+                # Calculate sums for beta and alpha
+                beta_sum = sum(max(cls) for cls in weights[:b])
+                alpha_sum = sum(min(cls) for cls in weights[b:])
+                total_sum = beta_sum + alpha_sum
+                print(f"b={b}, beta_sum={beta_sum}, alpha_sum={alpha_sum}, total_sum={total_sum}")
+
+                if total_sum > c:
                     break
-                else:
-                    D = set()  # Skip this participant
-            
-        N_prime.add(i)  # Mark participant as processed
-    
-    print("Core stability check completed.")
-    return assignments
+                b += 1
+
+            if b == 1:
+                Wbar = 0
+            else:
+                Wbar = sum(max(weights[i]) for i in range(b - 1))
+            r = max(max(weights[i]) for i in range(k))
+            print(f"Calculated Wbar={Wbar}, r={r}, b={b}")
+            return b, Wbar, r
+
+        except Exception as e:
+            print(f"Error in find_b_Wbar_r: {e}")
+            raise e
+
+    def algorithm_mcssp(weights, c):
+        """Implement MCSSP using dynamic programming to determine feasible reassignments."""
+        try:
+            k = len(weights)
+            print(f"Starting algorithm_mcssp: weights={weights}, c={c}, number of groups={k}")
+
+            # Get initial values from find_b_Wbar_r
+            b, Wbar, r = find_b_Wbar_r(weights, c)
+            print(f"Breakpoint b={b}, Wbar={Wbar}, r={r}")
+
+            S = [[0] * (c + r + 1) for _ in range(k + 1)]
+            print(f"Initialized matrix S with dimensions [{k + 1}][{c + r + 1}]")
+
+            for participant_count in range(c - r + 1, c):
+                S[b - 1][participant_count] = 0
+            for participant_count in range(c + 1, c + r + 1):
+                S[b - 1][participant_count] = 1
+            S[b - 1][Wbar] = b
+
+            # Dynamic programming loop
+            for t in range(b, k + 1):
+                for participant_count in range(c - r + 1, c + r + 1):
+                    S[t][participant_count] = S[t - 1][participant_count]
+
+                max_weight = max(weights[t - 1])
+                for participant_count in range(c - r + 1, c + 1):
+                    for i in range(len(weights[t - 1])):
+                        new_count = participant_count + weights[t - 1][i] - weights[t - 1][0]
+                        if 0 <= new_count < len(S[t]):
+                            S[t][new_count] = max(S[t][new_count], S[t - 1][participant_count])
+
+                for participant_count in range(c + max_weight, c, -1):
+                    for j in range(S[t - 1][participant_count], S[t][participant_count]):
+                        for i in range(len(weights[j - 1])):
+                            new_count = participant_count + weights[j - 1][i] - max(weights[j - 1])
+                            if 0 <= new_count < len(S[t]):
+                                S[t][new_count] = max(S[t][new_count], j)
+
+            column_C_values = [S[row][c] for row in range(b - 1, k + 1)]
+            optimal_solution = max(column_C_values)
+            print(f"Optimal solution found: {optimal_solution}")
+            return optimal_solution
+
+        except Exception as e:
+            print(f"Error in algorithm_mcssp: {e}")
+            raise e
+
+    def can_reassign_with_mcssp(B, target_activity, min_bounds, max_bounds, weights, capacity):
+        """Wrapper to use Pisinger's MCSSP logic for checking if group reassignment is feasible."""
+        try:
+            print(f"Starting can_reassign_with_mcssp: B={B}, target_activity={target_activity}, "
+                  f"min_bounds={min_bounds}, max_bounds={max_bounds}, weights={weights}, capacity={capacity}")
+
+            optimal_solution = algorithm_mcssp(weights, capacity)
+            print(f"MCSSP optimal solution: {optimal_solution}")
+            return optimal_solution > 0
+
+        except Exception as e:
+            print(f"Error in can_reassign_with_mcssp: {e}")
+            raise e
+
+    # Add detailed logging and debugging
+    print(f"Starting core_stability_check:")
+    print(f"Assignments (type: {type(assignments)}): {assignments}")
+    print(f"Preferences (type: {type(preferences)}): {preferences}")
+
+    # Ensure assignments is a dictionary or the expected format
+    if not isinstance(assignments, dict):
+        raise TypeError(f"Expected 'assignments' to be a dict, but got {type(assignments)}")
+
+    stability_violations = []  # To track participants whose assignments violate core stability
+
+    try:
+        for i in range(n):
+            if i not in assignments:
+                raise KeyError(f"Participant {i} missing from assignments")
+
+            current_activity = assignments[i]  # Now, current_activity is the activity index, not a tuple
+            if not isinstance(current_activity, int):
+                raise TypeError(f"Expected activity index to be 'int' but got {type(current_activity)} for participant {i}")
+
+            print(f"Participant {i} assigned to activity {current_activity}")
+
+            # Set of activities that are more preferred than the current activity
+            D = {b for b in range(a) if preferences[i][b] > preferences[i][current_activity]}
+            print(f"Participant {i}'s more preferred activities: {D}")
+
+            while D:
+                b = D.pop()  # Take one activity from D
+                print(f"Participant {i} is considering switching to activity {b}")
+
+                # All participants who prefer activity b more
+                B = {j for j in range(n) if preferences[j][b] > preferences[j][assignments[j]]}
+                print(f"Participants who prefer activity {b} more than their current assignment: {B}")
+
+                weights = [[1] * len(B)]  # Use real data for weights based on preferences
+                capacity = max_bounds[b]  # Max allowed participants at the target activity
+
+                if can_reassign_with_mcssp(B, b, min_bounds, max_bounds, weights, capacity):
+                    print(f"Participant {i} can be reassigned to activity {b}")
+                    assignments[i] = b  # Reassign participant i to activity b
+                    stability_violations.append(
+                        f"Participant {i} can improve by switching to activity {b} (current assignment is {current_activity})."
+                    )
+                    break
+        print("Core stability check completed.")
+
+    except Exception as e:
+        print(f"Error during core stability check for participant {i}: {e}")
+        raise e
+
+    return assignments, stability_violations
 
 def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, participants, events):
     model = LpProblem("ActivityAssignment", LpMaximize)
@@ -844,8 +964,11 @@ def view_allocation_new(request):
 
         # Core stability check using the core_stability_check function
         # core_stability_results = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
+        core_stability_violations=[]
 
-        core_stability_violations = []
+#         assignments, core_stability_violations = core_stability_check(
+#     n, a, assignment_dict, Preferences, min_bounds, max_bounds
+# )
         # for i, j in core_stability_results:
         #     core_stability_violations.append(
         #         f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
@@ -1328,7 +1451,9 @@ def view_allocation_max(request):
                 )
 
         # Core stability check using the core_stability_check function
-        core_stability_results = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
+        assignments, core_stability_violations = core_stability_check(
+    n, a, assignment_dict, Preferences, min_bounds, max_bounds
+)
 
         # core_stability_violations = []
         # for i, j in core_stability_results:
@@ -1347,8 +1472,8 @@ def view_allocation_max(request):
 
         # Add messages for core stability violations
         if core_stability_violations:
-            # for violation in core_stability_violations:
-            #     messages.warning(request, violation)
+            for violation in core_stability_violations:
+                messages.warning(request, violation)
             messages.error(request, "The assignment is not core stable.")
         else:
             messages.success(request, "The assignment is core stable.")
