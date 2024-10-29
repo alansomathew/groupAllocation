@@ -1,10 +1,12 @@
 from AllocationAdmin.models import Event, ParticipantActivity, Participant
+from itertools import product
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
 # from gurobipy import Model, GRB, quicksum
-from pulp import LpMaximize, LpProblem, LpVariable, lpSum, LpBinary, value
+from pulp import LpProblem, LpMaximize, LpVariable, lpSum, value, LpBinary
+import pulp
 import ast
 
 
@@ -230,13 +232,13 @@ def list_participants(request, id):
 #         return redirect('list_participants', id=id)
 
 
+# Function to solve activity assignment using linear programming (as given in your original code)
 def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, participant_names, event_names):
     # Define the model
     model = LpProblem("ActivityAssignment", LpMaximize)
 
     # Decision variables
-    x = LpVariable.dicts("x", ((i, j) for i in range(n)
-                         for j in range(a)), cat=LpBinary)
+    x = LpVariable.dicts("x", ((i, j) for i in range(n) for j in range(a)), cat=LpBinary)
     y = LpVariable.dicts("y", (j for j in range(a)), cat=LpBinary)
 
     # Normalize preferences
@@ -244,8 +246,7 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, partici
         [min(1, max(0, Preferences[i][j])) for j in range(a)] for i in range(n)]
 
     # Objective function
-    model += lpSum(normalized_preferences[i][j] * x[i, j]
-                   for i in range(n) for j in range(a))
+    model += lpSum(normalized_preferences[i][j] * x[i, j] for i in range(n) for j in range(a))
 
     # Constraints
     # Each participant must be assigned to at most one activity
@@ -259,8 +260,7 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, partici
 
     # Preference constraints: Ensure a participant is not assigned to activities with negative preferences
     for i in range(n):
-        model += lpSum(normalized_preferences[i]
-                       [j] * x[i, j] for j in range(a)) >= 0
+        model += lpSum(normalized_preferences[i][j] * x[i, j] for j in range(a)) >= 0
 
     # Ensure correct values for assigned activities
     for j in range(a):
@@ -278,52 +278,157 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, partici
 
     assigned_activities = [j for j in range(a) if value(y[j]) > 0.5]
 
-    # Check Individual Stability
-    individual_stability_violations = []
-    for i in range(n):
-        assigned_event = next(j for j in range(a) if value(x[i, j]) > 0.5)
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event] and value(x[i, j]) == 0:
-                individual_stability_violations.append(
-                    f"{participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
-                )
-
-    # Check Core Stability
-    core_stability_violations = []
-    for i in range(n):
-        assigned_event = next(j for j in range(a) if value(x[i, j]) > 0.5)
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event] and value(x[i, j]) == 0:
-                can_switch = True
-                for k in range(n):
-                    if value(x[k, j]) > 0.5 and Preferences[k][assigned_event] > Preferences[k][j]:
-                        can_switch = False
-                        break
-                if can_switch:
-                    core_stability_violations.append(
-                        f"{participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
-                    )
-
-    # Check Individual Rationality
-    individual_rationality_violations = []
-    for i in range(n):
-        assigned_event = next(j for j in range(a) if value(x[i, j]) > 0.5)
-        if Preferences[i][assigned_event] <= 0:
-            individual_rationality_violations.append(
-                f"{participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
-            )
-
-    return (assignments, assigned_activities,
-            individual_stability_violations, core_stability_violations,
-            individual_rationality_violations)
+    return assignments, assigned_activities
 
 
+# Function to compute feasible R values for each activity
+def compute_R_values(assignments, min_bounds, max_bounds):
+    """
+    Compute the R values for each activity, considering both minimum and maximum bounds.
+    """
+    R = {}
+    for activity in set(assignments.values()):
+        current_count = len([k for k in assignments.values() if k == activity])
+        min_count = min_bounds[activity]
+        max_count = max_bounds[activity]
+
+        # Generate R values considering both lower and upper bounds
+        R[activity] = [0]
+        for h in range(1, current_count + 1):
+            if (current_count - h) >= min_count and (current_count - h) <= max_count:
+                R[activity].append(h)
+
+    return R
+
+def find_b_Wbar_r(R, c):
+    """
+    Determine the breakpoint 'b', total weight 'Wbar', and maximum weight 'r' using R values.
+    
+    Parameters:
+    R (dict): Dictionary where keys are activities and values are lists of feasible sets for each activity.
+    c (int): Capacity limit for the target activity.
+    
+    Returns:
+    tuple: (b, Wbar, r)
+    """
+    try:
+        # Total number of activities considered
+        k = len(R)
+
+        # Initialize b to start at the first activity
+        b = 1
+
+        while True:
+            if b > k:
+                # Raise an exception if the index exceeds the number of activities
+                raise IndexError(f"Attempted to access non-existent index in 'R'. b={b}, len(R)={k}")
+
+            # Calculate the sum of beta and alpha:
+            # Beta sum includes the maximum feasible agents that can be moved up to the breakpoint 'b'
+            beta_sum = sum(max(R[cls]) for cls in range(b))
+
+            # Alpha sum includes the minimum feasible agents from 'b' to 'k' (remaining activities)
+            alpha_sum = sum(min(R[cls]) for cls in range(b, k))
+
+            # Calculate total sum of alpha and beta
+            total_sum = beta_sum + alpha_sum
+
+            # Check if the total exceeds the capacity
+            if total_sum > c:
+                break
+
+            # Increment the breakpoint if condition is not met
+            b += 1
+
+        # If b equals 1, set Wbar to 0, otherwise compute the sum of max weights for (b-1) activities
+        if b == 1:
+            Wbar = 0
+        else:
+            Wbar = sum(max(R[i]) for i in range(b - 1))
+
+        # Determine the maximum value of weights 'r'
+        r = max(max(R[i]) for i in range(k))
+
+        # Return the computed b, Wbar, and r
+        return b, Wbar, r
+
+    except Exception as e:
+        raise e
+
+
+# Function to implement the MCSSP algorithm for core stability check
+def algorithm_mcssp(R, c):
+    """Implement MCSSP using dynamic programming to determine feasible reassignments using R values."""
+    k = len(R)
+    b, Wbar, r = find_b_Wbar_r(R, c)
+
+    S = [[0] * (c + r + 1) for _ in range(k + 1)]
+    for participant_count in range(c - r + 1, c):
+        S[b - 1][participant_count] = 0
+    for participant_count in range(c + 1, c + r + 1):
+        S[b - 1][participant_count] = 1
+    S[b - 1][Wbar] = b
+
+    for t in range(b, k + 1):
+        for participant_count in range(c - r + 1, c + r + 1):
+            S[t][participant_count] = S[t - 1][participant_count]
+
+        max_weight = max(R[t - 1])
+        for participant_count in range(c - r + 1, c + 1):
+            for i in R[t - 1]:
+                new_count = participant_count + i - min(R[t - 1])
+                if 0 <= new_count < len(S[t]):
+                    S[t][new_count] = max(S[t][new_count], S[t - 1][participant_count])
+
+        for participant_count in range(c + max_weight, c, -1):
+            for j in range(S[t - 1][participant_count], S[t][participant_count]):
+                for i in R[j - 1]:
+                    new_count = participant_count + i - max(R[j - 1])
+                    if 0 <= new_count < len(S[t]):
+                        S[t][new_count] = max(S[t][new_count], j)
+
+    column_C_values = [S[row][c] for row in range(b - 1, k + 1)]
+    optimal_solution = max(column_C_values)
+    return optimal_solution
+
+
+# Function to check core stability using MCSSP
+def core_stability_check_mcssp(n, a, assignments, preferences, min_bounds, max_bounds):
+    """
+    Core Stability Check using MCSSP to determine feasible reassignments using R values.
+    """
+    stability_violations = []
+    reassignment = []
+
+    # Iterate over each agent to check if core stability is violated
+    for agent in range(n):
+        current_activity = assignments[agent]
+        preferred_activities = [b for b in range(a) if preferences[agent][b] > preferences[agent][current_activity]]
+
+        for target_activity in preferred_activities:
+            # Form the coalition of agents
+            coalition = [j for j in range(n) if preferences[j][target_activity] > preferences[j][assignments[j]]]
+
+            if not coalition:
+                continue
+
+            # Compute R values for each activity
+            R = compute_R_values(assignments, min_bounds, max_bounds)
+
+            # Use MCSSP to check if a valid subset can move to the target activity
+            if algorithm_mcssp(R, max_bounds[target_activity]) > 0:
+                reassignment.extend(coalition)
+                stability_violations.append(f"Agent {agent} and coalition can feasibly move to activity {target_activity}.")
+                break
+
+    return reassignment, stability_violations
+
+
+@login_required
 def allocate_participants_to_activities(request):
-    # Get the active events created by the current user (organizer)
+    # Get active events created by the current user (organizer)
     events = Event.objects.filter(is_active=True, created_by=request.user)
-    participants = Participant.objects.filter(
-        participantactivity__event__in=events
-    ).distinct()
+    participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
 
     n = participants.count()
     a = events.count()
@@ -347,70 +452,33 @@ def allocate_participants_to_activities(request):
             preferences.append(activity_preference.preference if activity_preference else 0)
         Preferences.append(preferences)
 
-    # Calculate total preferences for each event
-    total_preferences = [0] * a
-    for i in range(n):
-        for j in range(a):
-            total_preferences[j] += Preferences[i][j]
-
-    max_pref_value = max(total_preferences)
-    min_pref_value = min(total_preferences)
-
-    max_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == max_pref_value]
-    min_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == min_pref_value]
-
     # Solve the assignment problem
-    assignments, assigned_activities, individual_stability_violations, core_stability_violations, individual_rationality_violations = solve_activity_assignment(
+    assignments, assigned_activities = solve_activity_assignment(
         n, a, min_bounds, max_bounds, Preferences, participant_names, event_names
     )
 
-    # Update participant assignments in the database
+    assignment_dict = {i: j for i, j in assignments}
+
+    # Perform Core Stability Check using MCSSP
+    reassignment, core_stability_violations = core_stability_check_mcssp(
+        n, a, assignment_dict, Preferences, min_bounds, max_bounds
+    )
+
+    # Apply Reassignment in the Database
     with transaction.atomic():
-        for participant_idx, event_idx in assignments:
+        for participant_idx in reassignment:
             participant = participants[participant_idx]
-            event = events[event_idx]
+            event = events[assignment_dict[participant_idx]]
             participant.assigned_to = event
             participant.save()
 
-    # Check if all participants are allocated
-    if len(assignments) == n:
-        messages.success(request, "All participants are involved in the allocation.")
+    # Provide feedback
+    if core_stability_violations:
+        for violation in core_stability_violations:
+            messages.warning(request, violation)
+        messages.error(request, "The assignment is not core stable.")
     else:
-        messages.warning(request, "Not all participants are involved in the allocation.")
-
-    # Check if all events have at least one participant
-    if len(assigned_activities) == a:
-        messages.success(request, "All events have at least one participant.")
-    else:
-        messages.warning(request, "Not all events have participants.")
-
-    # Provide feedback on individual stability
-    # if individual_stability_violations:
-    #     for violation in individual_stability_violations:
-    #         messages.warning(request, violation)
-    #     messages.error(request, "The assignment is not individually stable.")
-    # else:
-    #     messages.success(request, "The assignment is individually stable.")
-
-    # Provide feedback on core stability
-    # if core_stability_violations:
-    #     for violation in core_stability_violations:
-    #         messages.warning(request, violation)
-    #     messages.error(request, "The assignment is not core stable.")
-    # else:
-    #     messages.success(request, "The assignment is core stable.")
-
-    # Provide feedback on individual rationality
-    # if individual_rationality_violations:
-    #     for violation in individual_rationality_violations:
-    #         messages.warning(request, violation)
-    #     messages.error(request, "The assignment is not individually rational.")
-    # else:
-    #     messages.success(request, "The assignment is individually rational.")
-
-    # Display Most and Least Interested Activities
-    # messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
-    # messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
+        messages.success(request, "The assignment is core stable.")
 
     return redirect('view_allocation')
 
@@ -432,8 +500,7 @@ def view_allocation(request):
         n = len(participants)
 
         if n == 0 or a == 0:
-            messages.warning(
-                request, "No participants or events available for viewing.")
+            messages.warning(request, "No participants or events available for viewing.")
             return redirect('home')
 
         # Prepare the Preferences matrix and assignment dictionary
@@ -454,8 +521,7 @@ def view_allocation(request):
             for event in events_list:
                 activity_preference = ParticipantActivity.objects.filter(
                     participant=participant, event=event).first()
-                preferences.append(
-                    activity_preference.preference if activity_preference else 0)
+                preferences.append(activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
 
         participant_names = [participant.name for participant in participants]
@@ -467,44 +533,23 @@ def view_allocation(request):
             if i in assignment_dict:
                 assigned_event = assignment_dict[i]
                 for j in range(a):
-                    if Preferences[i][j] > Preferences[i][assigned_event] and assignment_dict.get(i) != j:
+                    if Preferences[i][j] > Preferences[i][assigned_event] and j != assigned_event:
                         individual_stability_violations.append(
                             f"{participant_names[i]} can improve by switching from {event_names[assigned_event]} to {event_names[j]}."
                         )
 
-        # Core stability check using the core_stability_check function
+        # Core stability check using MCSSP
         min_bounds = list(events.values_list('min_participants', flat=True))
         max_bounds = list(events.values_list('max_participants', flat=True))
-        # print(f"Assignment Dict: {assignment_dict}")
-        # print(f"Preferences: {Preferences}")
-        #         assignments, core_stability_violations = core_stability_check(
-        #     n, a, assignment_dict, Preferences, min_bounds, max_bounds
-        # )
-        #         print(core_stability_violations)
-        core_stability_violations=[]
 
-        #         assignments, core_stability_violations = core_stability_check(
-        #     n, a, assignment_dict, Preferences, min_bounds, max_bounds
-        # )
-        # for i, j in core_stability_results:
-        #     core_stability_violations.append(
-        #         f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
-        #     )
+        # Compute core stability violations using MCSSP
+        reassignment, core_stability_violations = core_stability_check_mcssp(
+            n, a, assignment_dict, Preferences, min_bounds, max_bounds
+        )
 
-        # Check Core Stability
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
-                can_switch = True
-                for k in range(n):
-                    if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
-                        can_switch = False
-                        break
-                if can_switch:
-                    core_stability_violations.append(
-                        f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
-
-                    )
-
+        # Update reassignment if applicable (for the view, not the database)
+        for participant_idx in reassignment:
+            assignment_dict[participant_idx] = max_bounds[assignment_dict[participant_idx]]
 
         # Check individual rationality
         individual_rationality_violations = []
@@ -514,19 +559,17 @@ def view_allocation(request):
                 if Preferences[i][assigned_event] <= 0:
                     individual_rationality_violations.append(
                         f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event]}."
-
-                
                     )
 
         # Add messages for individual stability violations
         if individual_stability_violations:
             for violation in individual_stability_violations:
                 messages.warning(request, violation)
-            messages.error(
-                request, "The assignment is not individually stable.")
+            messages.error(request, "The assignment is not individually stable.")
         else:
             messages.success(request, "The assignment is individually stable.")
-        
+
+        # Add messages for core stability violations
         if core_stability_violations:
             for violation in core_stability_violations:
                 messages.warning(request, violation)
@@ -538,204 +581,135 @@ def view_allocation(request):
         if individual_rationality_violations:
             for violation in individual_rationality_violations:
                 messages.warning(request, violation)
-            messages.error(
-                request, "The assignment is not individually rational.")
+            messages.error(request, "The assignment is not individually rational.")
         else:
-            messages.success(
-                request, "The assignment is individually rational.")
+            messages.success(request, "The assignment is individually rational.")
 
-        return render(request, 'Organizer/allocation.html', {
+        # Display the allocation summary
+        context = {
             'participants': participants,
             'events': events,
-        })
+            'individual_stability_violations': individual_stability_violations,
+            'core_stability_violations': core_stability_violations,
+            'individual_rationality_violations': individual_rationality_violations,
+            'assignments': assignments,
+            'event_names': event_names,
+            'participant_names': participant_names,
+        }
+
+        return render(request, 'Organizer/allocation.html', context)
 
     except Exception as e:
         print(e)
         messages.error(request, 'Error viewing allocations!')
         return render(request, 'Organizer/allocation.html')
 
-
-def core_stability_check(n, a, assignments, preferences, min_bounds, max_bounds):
+def compute_R_values_new(assignments, min_bounds, max_bounds):
     """
-    Core Stability Check using MCSSP to determine feasible reassignments.
-    Only return assignments that do not match the current stable assignments.
-    n: Number of participants
-    a: Number of activities
-    assignments: Current assignment of participants (dict of participant -> activity index)
-    preferences: List of preferences for each participant (list of list)
-    min_bounds: Minimum number of participants allowed per activity
-    max_bounds: Maximum number of participants allowed per activity
+    Compute the R values for each activity.
+    R represents the range of feasible numbers of participants that can be moved from each activity,
+    considering both minimum and maximum bounds.
     """
+    R = {}
+    for activity in set(assignments.values()):
+        current_count = len([k for k in assignments.values() if k == activity])
+        min_count = min_bounds[activity]
+        max_count = max_bounds[activity]
 
-    def find_b_Wbar_r(weights, c):
-        """Determine the breakpoint 'b', total weight 'Wbar', and maximum weight 'r'."""
-        try:
-            k = len(weights)
-            b = 1
-            print(f"Starting find_b_Wbar_r: weights={weights}, c={c}, number of groups={k}")
+        # Generate R values considering both lower and upper bounds
+        R[activity] = [0]
+        for h in range(1, current_count + 1):
+            if (current_count - h) >= min_count and (current_count - h) <= max_count:
+                R[activity].append(h)
 
-            while True:
-                if b > k:  # Check if 'b' is out of bounds
-                    raise IndexError(f"Attempted to access non-existent index in 'weights'. b={b}, len(weights)={k}")
+    return R
 
-                # Calculate sums for beta and alpha
-                beta_sum = sum(max(cls) for cls in weights[:b])
-                alpha_sum = sum(min(cls) for cls in weights[b:])
-                total_sum = beta_sum + alpha_sum
-                print(f"b={b}, beta_sum={beta_sum}, alpha_sum={alpha_sum}, total_sum={total_sum}")
+def find_b_Wbar_r_new(R, c):
+    """Calculate breakpoint 'b', total weight 'Wbar', and maximum weight 'r' using R values."""
+    activities = list(R.keys())  # Get the list of activities (keys of R)
+    k = len(activities)
+    b = 1
+    Wbar = 0
 
-                if total_sum > c:
-                    break
-                b += 1
+    while b <= k:
+        # Calculate sums for beta and alpha using activity keys
+        beta_activities = activities[:b]  # Activities up to b (exclusive)
+        alpha_activities = activities[b:]  # Activities from b onward
 
-            if b == 1:
-                Wbar = 0
-            else:
-                Wbar = sum(max(weights[i]) for i in range(b - 1))
-            r = max(max(weights[i]) for i in range(k))
-            print(f"Calculated Wbar={Wbar}, r={r}, b={b}")
-            return b, Wbar, r
+        beta_sum = sum(max(R[activity]) for activity in beta_activities)  # Sum of maximum values for first b activities
+        alpha_sum = sum(min(R[activity]) for activity in alpha_activities)  # Sum of minimum values for remaining activities
+        total_sum = beta_sum + alpha_sum
 
-        except Exception as e:
-            print(f"Error in find_b_Wbar_r: {e}")
-            raise e
+        # Check if total sum exceeds the capacity c
+        if total_sum > c:
+            break
 
-    def algorithm_mcssp(weights, c):
-        """Implement MCSSP using dynamic programming to determine feasible reassignments."""
-        try:
-            k = len(weights)
-            print(f"Starting algorithm_mcssp: weights={weights}, c={c}, number of groups={k}")
+        Wbar = beta_sum  # Update Wbar if the sum doesn't exceed capacity
+        b += 1
 
-            # Get initial values from find_b_Wbar_r
-            b, Wbar, r = find_b_Wbar_r(weights, c)
-            print(f"Breakpoint b={b}, Wbar={Wbar}, r={r}")
+    # Calculate r as the maximum value across all R values
+    r = max(max(R[activity]) for activity in activities)
+    return b, Wbar, r
 
-            S = [[0] * (c + r + 1) for _ in range(k + 1)]
-            print(f"Initialized matrix S with dimensions [{k + 1}][{c + r + 1}]")
 
-            for participant_count in range(c - r + 1, c):
-                S[b - 1][participant_count] = 0
-            for participant_count in range(c + 1, c + r + 1):
-                S[b - 1][participant_count] = 1
-            S[b - 1][Wbar] = b
+def algorithm_mcssp_new(R, c):
+    """Implement MCSSP using dynamic programming to determine feasible reassignments using R values."""
+    k = len(R)
+    b, Wbar, r = find_b_Wbar_r_new(R, c)
 
-            # Dynamic programming loop
-            for t in range(b, k + 1):
-                for participant_count in range(c - r + 1, c + r + 1):
-                    S[t][participant_count] = S[t - 1][participant_count]
+    S = [[0] * (c + r + 1) for _ in range(k + 1)]
+    for participant_count in range(c - r + 1, c):
+        S[b - 1][participant_count] = 0
+    for participant_count in range(c + 1, c + r + 1):
+        S[b - 1][participant_count] = 1
+    S[b - 1][Wbar] = b
 
-                max_weight = max(weights[t - 1])
-                for participant_count in range(c - r + 1, c + 1):
-                    for i in range(len(weights[t - 1])):
-                        new_count = participant_count + weights[t - 1][i] - weights[t - 1][0]
-                        if 0 <= new_count < len(S[t]):
-                            S[t][new_count] = max(S[t][new_count], S[t - 1][participant_count])
+    for t in range(b, k + 1):
+        for participant_count in range(c - r + 1, c + r + 1):
+            S[t][participant_count] = S[t - 1][participant_count]
 
-                for participant_count in range(c + max_weight, c, -1):
-                    for j in range(S[t - 1][participant_count], S[t][participant_count]):
-                        for i in range(len(weights[j - 1])):
-                            new_count = participant_count + weights[j - 1][i] - max(weights[j - 1])
-                            if 0 <= new_count < len(S[t]):
-                                S[t][new_count] = max(S[t][new_count], j)
+        max_weight = max(R[t - 1])
+        for participant_count in range(c - r + 1, c + 1):
+            for i in R[t - 1]:
+                new_count = participant_count + i - min(R[t - 1])
+                if 0 <= new_count < len(S[t]):
+                    S[t][new_count] = max(S[t][new_count], S[t - 1][participant_count])
 
-            column_C_values = [S[row][c] for row in range(b - 1, k + 1)]
-            optimal_solution = max(column_C_values)
-            print(f"Optimal solution found: {optimal_solution}")
-            return optimal_solution
+        for participant_count in range(c + max_weight, c, -1):
+            for j in range(S[t - 1][participant_count], S[t][participant_count]):
+                for i in R[j - 1]:
+                    new_count = participant_count + i - max(R[j - 1])
+                    if 0 <= new_count < len(S[t]):
+                        S[t][new_count] = max(S[t][new_count], j)
 
-        except Exception as e:
-            print(f"Error in algorithm_mcssp: {e}")
-            raise e
-
-    def can_reassign_with_mcssp(B, target_activity, min_bounds, max_bounds, weights, capacity):
-        """Wrapper to use Pisinger's MCSSP logic for checking if group reassignment is feasible."""
-        try:
-            print(f"Starting can_reassign_with_mcssp: B={B}, target_activity={target_activity}, "
-                  f"min_bounds={min_bounds}, max_bounds={max_bounds}, weights={weights}, capacity={capacity}")
-
-            optimal_solution = algorithm_mcssp(weights, capacity)
-            print(f"MCSSP optimal solution: {optimal_solution}")
-            return optimal_solution > 0
-
-        except Exception as e:
-            print(f"Error in can_reassign_with_mcssp: {e}")
-            raise e
-
-    # Add detailed logging and debugging
-    print(f"Starting core_stability_check:")
-    print(f"Assignments (type: {type(assignments)}): {assignments}")
-    print(f"Preferences (type: {type(preferences)}): {preferences}")
-
-    # Ensure assignments is a dictionary or the expected format
-    if not isinstance(assignments, dict):
-        raise TypeError(f"Expected 'assignments' to be a dict, but got {type(assignments)}")
-
-    stability_violations = []  # To track participants whose assignments violate core stability
-
-    try:
-        for i in range(n):
-            if i not in assignments:
-                raise KeyError(f"Participant {i} missing from assignments")
-
-            current_activity = assignments[i]  # Now, current_activity is the activity index, not a tuple
-            if not isinstance(current_activity, int):
-                raise TypeError(f"Expected activity index to be 'int' but got {type(current_activity)} for participant {i}")
-
-            print(f"Participant {i} assigned to activity {current_activity}")
-
-            # Set of activities that are more preferred than the current activity
-            D = {b for b in range(a) if preferences[i][b] > preferences[i][current_activity]}
-            print(f"Participant {i}'s more preferred activities: {D}")
-
-            while D:
-                b = D.pop()  # Take one activity from D
-                print(f"Participant {i} is considering switching to activity {b}")
-
-                # All participants who prefer activity b more
-                B = {j for j in range(n) if preferences[j][b] > preferences[j][assignments[j]]}
-                print(f"Participants who prefer activity {b} more than their current assignment: {B}")
-
-                weights = [[1] * len(B)]  # Use real data for weights based on preferences
-                capacity = max_bounds[b]  # Max allowed participants at the target activity
-
-                if can_reassign_with_mcssp(B, b, min_bounds, max_bounds, weights, capacity):
-                    print(f"Participant {i} can be reassigned to activity {b}")
-                    assignments[i] = b  # Reassign participant i to activity b
-                    stability_violations.append(
-                        f"Participant {i} can improve by switching to activity {b} (current assignment is {current_activity})."
-                    )
-                    break
-        print("Core stability check completed.")
-
-    except Exception as e:
-        print(f"Error during core stability check for participant {i}: {e}")
-        raise e
-
-    return assignments, stability_violations
+    column_C_values = [S[row][c] for row in range(b - 1, k + 1)]
+    optimal_solution = max(column_C_values)
+    return optimal_solution
 
 def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, participants, events):
     model = LpProblem("ActivityAssignment", LpMaximize)
-    x = LpVariable.dicts("x", ((i, j) for i in range(n)
-                         for j in range(a)), cat=LpBinary)
+
+    # Decision Variables
+    x = LpVariable.dicts("x", ((i, j) for i in range(n) for j in range(a)), cat=LpBinary)
     y = LpVariable.dicts("y", (j for j in range(a)), cat=LpBinary)
 
+    # Normalize Preferences
     normalized_preferences = [
-        [max(0, min(1, Preferences[i][j])) for j in range(a)] for i in range(n)]
-    model += lpSum(normalized_preferences[i][j] * x[i, j]
-                   for i in range(n) for j in range(a))
+        [max(0, min(1, Preferences[i][j])) for j in range(a)] for i in range(n)
+    ]
+    model += lpSum(normalized_preferences[i][j] * x[i, j] for i in range(n) for j in range(a))
 
     # Constraints
     for i in range(n):
-        model += lpSum(x[i, j]
-                       for j in range(a)) <= 1, f"Participant_{i}_Assignment"
+        model += lpSum(x[i, j] for j in range(a)) <= 1, f"Participant_{i}_Assignment"
+    
     for j in range(a):
-        model += min_bounds[j] * y[j] <= lpSum(x[i, j]
-                                               for i in range(n)), f"Min_Participants_Activity_{j}"
-        model += lpSum(x[i, j] for i in range(n)) <= max_bounds[j] * \
-            y[j], f"Max_Participants_Activity_{j}"
+        model += min_bounds[j] * y[j] <= lpSum(x[i, j] for i in range(n)), f"Min_Participants_Activity_{j}"
+        model += lpSum(x[i, j] for i in range(n)) <= max_bounds[j] * y[j], f"Max_Participants_Activity_{j}"
+    
     for j in range(a):
-        model += lpSum(x[i, j]
-                       for i in range(n)) >= y[j], f"Activity_{j}_Activation"
+        model += lpSum(x[i, j] for i in range(n)) >= y[j], f"Activity_{j}_Activation"
+    
     for i in range(n):
         for j in range(a):
             if Preferences[i][j] < 0:
@@ -745,59 +719,30 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, pa
     model.solve()
 
     # Collect assignments and assigned activities
-    assignments = [(i, j) for i in range(n)
-                   for j in range(a) if x[i, j].varValue > 0.5]
+    assignments = [(i, j) for i in range(n) for j in range(a) if x[i, j].varValue > 0.5]
     assigned_activities = [j for j in range(a) if y[j].varValue > 0.5]
 
     # Mapping indices to names
     participant_names = [p.name for p in participants]
     event_names = [e.name for e in events]
 
-    # Check for individual stability
-    individual_stability_violations = []
-    for i in range(n):
-        assigned_event = next(j for j in range(a) if x[i, j].varValue > 0.5)
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event] and x[i, j].varValue == 0:
-                individual_stability_violations.append(
-                    f" {participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
-                )
+    # Compute R values
+    assignment_dict = {i: j for i, j in assignments}
+    R_values = compute_R_values_new(assignment_dict, min_bounds, max_bounds)
 
-    # Check for core stability
-    core_stability_violations = []
-    for i in range(n):
-        assigned_event = next(j for j in range(a) if x[i, j].varValue > 0.5)
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event] and x[i, j].varValue == 0:
-                can_switch = True
-                for k in range(n):
-                    if x[k, j].varValue > 0.5 and Preferences[k][assigned_event] > Preferences[k][j]:
-                        can_switch = False
-                        break
-                if can_switch:
-                    core_stability_violations.append(
-                        f" {participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
-                    )
+    # Calculate Wbar and r using find_b_Wbar_r_new function
+    for target_activity in range(a):
+        b, Wbar, r = find_b_Wbar_r_new(R_values, max_bounds[target_activity])
+        print(f"For target activity {event_names[target_activity]}: b = {b}, Wbar = {Wbar}, r = {r}")
 
-    # Check for individual rationality
-    individual_rationality_violations = []
-    for i in range(n):
-        assigned_event = next(j for j in range(a) if x[i, j].varValue > 0.5)
-        if Preferences[i][assigned_event] <= 0:
-            individual_rationality_violations.append(
-                f" {participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
-            )
-
-    return (assignments, assigned_activities,
-            individual_stability_violations, core_stability_violations,
-            individual_rationality_violations)
+    return assignments, assigned_activities
 
 
+# Updated View Allocation
+@login_required
 def allocate_participants_new(request):
     events = Event.objects.filter(is_active=True, created_by=request.user)
-    participants = Participant.objects.filter(
-        participantactivity__event__in=events
-    ).distinct()
+    participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
 
     n = participants.count()
     a = events.count()
@@ -817,31 +762,16 @@ def allocate_participants_new(request):
         preferences = []
         participant_names.append(participant.name)
         for event in events:
-            activity_preference = ParticipantActivity.objects.filter(
-                participant=participant, event=event).first()
-            preferences.append(
-                activity_preference.preference if activity_preference else 0)
+            activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
+            preferences.append(activity_preference.preference if activity_preference else 0)
         Preferences.append(preferences)
 
-    # Calculate total preferences for each event
-    total_preferences = [0] * a
-    for i in range(n):
-        for j in range(a):
-            total_preferences[j] += Preferences[i][j]
-
-    # Find the most and least interested activities
-    max_pref_value = max(total_preferences)
-    min_pref_value = min(total_preferences)
-
-    max_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == max_pref_value]
-    min_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == min_pref_value]
-
-    (assignments, assigned_activities,
-     individual_stability_violations, core_stability_violations,
-     individual_rationality_violations) = solve_activity_assignment_pulp(
+    # Solve the assignment problem
+    assignments, assigned_activities = solve_activity_assignment_pulp(
         n, a, min_bounds, max_bounds, Preferences, participants, events
     )
 
+    # Update participant assignments in the database
     with transaction.atomic():
         for participant_idx, event_idx in assignments:
             participant = participants[participant_idx]
@@ -849,46 +779,9 @@ def allocate_participants_new(request):
             participant.assigned_to_new = event
             participant.save()
 
-    # Check if all participants are allocated
-    if len(assignments) == n:
-        messages.success(request, "All participants are involved in the allocation.")
-    else:
-        messages.warning(request, "Not all participants are involved in the allocation.")
-
-    # Check if all events have at least one participant
-    if len(assigned_activities) == a:
-        messages.success(request, "All events have at least one participant.")
-    else:
-        messages.warning(request, "Not all events have participants.")
-
-    # Provide feedback on individual stability
-    # if individual_stability_violations:
-    #     for violation in individual_stability_violations:
-    #         messages.warning(request, violation)
-    #     messages.error(request, 'The assignment is not individually stable.')
-    # else:
-    #     messages.success(request, "The assignment is individually stable.")
-
-    # Provide feedback on core stability
-    # if core_stability_violations:
-    #     for violation in core_stability_violations:
-    #         messages.warning(request, violation)
-    #     messages.error(request, 'The assignment is not core stable.')
-    # else:
-    #     messages.success(request, "The assignment is core stable.")
-
-    # Provide feedback on individual rationality
-    # if individual_rationality_violations:
-    #     for violation in individual_rationality_violations:
-    #         messages.warning(request, violation)
-    #     messages.error(request, 'The assignment is not individually rational.')
-    # else:
-    #     messages.success(request, "The assignment is individually rational.")
-
     # Display Most and Least Interested Activities
-    # messages.info(request, f"Most Interested Activity: {', '.join(max_pref_events)}")
-    # messages.info(request, f"Least Interested Activity: {', '.join(min_pref_events)}")
-
+    messages.success(request, "Assignment is successfully calculated.")
+    
     return redirect('view_allocation_new')
 
 
@@ -908,8 +801,7 @@ def view_allocation_new(request):
         a = events.count()
 
         if n == 0 or a == 0:
-            messages.warning(
-                request, "No participants or events available for viewing.")
+            messages.warning(request, "No participants or events available for viewing.")
             return redirect('home')
 
         # Get the min and max bounds for events
@@ -919,33 +811,32 @@ def view_allocation_new(request):
         # Prepare the Preferences matrix and assignment dictionary
         Preferences = []
         assignment_dict = {}
-        assignments = []  # Store current assignments
+        assignments = []
 
         for idx, participant in enumerate(participants):
             preferences = []
-            # Assuming "assigned_to_new" holds the new assignment
             assigned_event = participant.assigned_to_new
-            assigned_event_idx = list(events).index(
-                assigned_event) if assigned_event in events else None
+            assigned_event_idx = list(events).index(assigned_event) if assigned_event in events else None
             if assigned_event_idx is not None:
-                assignment_dict[idx] = [assigned_event_idx]
-                assignments.append((idx, assigned_event_idx))  # Add current assignment
+                assignment_dict[idx] = assigned_event_idx  # Use a scalar value here
+                assignments.append((idx, assigned_event_idx))
 
             for event in events:
-                activity_preference = ParticipantActivity.objects.filter(
-                    participant=participant, event=event).first()
-                preferences.append(
-                    activity_preference.preference if activity_preference else 0)
+                activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
+                preferences.append(activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
 
-        # Check for individual stability, core stability, and individual rationality
+        # Initialize lists to hold stability violations
         individual_stability_violations = []
         individual_rationality_violations = []
+        core_stability_violations = []
+
         participant_names = [p.name for p in participants]
         event_names = [e.name for e in events]
 
+        # **Individual Stability Check**
         for i in range(n):
-            assigned_event_idx = assignment_dict.get(i, [None])[0]
+            assigned_event_idx = assignment_dict.get(i)
             if assigned_event_idx is None:
                 continue
 
@@ -956,49 +847,32 @@ def view_allocation_new(request):
                         f"{participant_names[i]} can improve by switching from {event_names[assigned_event_idx]} to {event_names[j]}."
                     )
 
-            # Check Individual Rationality
+            # **Individual Rationality Check**
             if Preferences[i][assigned_event_idx] <= 0:
                 individual_rationality_violations.append(
                     f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
                 )
 
-        # Core stability check using the core_stability_check function
-        # core_stability_results = core_stability_check(n, a, assignments, Preferences, min_bounds, max_bounds)
-        core_stability_violations=[]
+        # **Core Stability Check**
+        R_values = compute_R_values_new(assignment_dict, min_bounds, max_bounds)
+        for i in range(n):
+            assigned_event_idx = assignment_dict.get(i)
+            for j in range(a):
+                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                    # Determine if the coalition can move to activity j
+                    if algorithm_mcssp_new(R_values, max_bounds[j]) > 0:
+                        core_stability_violations.append(
+                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+                        )
 
-#         assignments, core_stability_violations = core_stability_check(
-#     n, a, assignment_dict, Preferences, min_bounds, max_bounds
-# )
-        # for i, j in core_stability_results:
-        #     core_stability_violations.append(
-        #         f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
-        #     )
-
-        # Check Core Stability
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
-                can_switch = True
-                for k in range(n):
-                    if assignment_dict.get(k, [None])[0] == j and Preferences[k][assigned_event_idx] > Preferences[k][j]:
-                        can_switch = False
-                        break
-                if can_switch:
-                    core_stability_violations.append(
-                        f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
-
-                    )
-            # Add messages for individual stability violations
-
-        # Add messages for individual stability violations
+        # **Messages for Stability Violations**
         if individual_stability_violations:
             for violation in individual_stability_violations:
                 messages.warning(request, violation)
-            messages.error(
-                request, "The assignment is not individually stable.")
+            messages.error(request, "The assignment is not individually stable.")
         else:
             messages.success(request, "The assignment is individually stable.")
 
-        # Add messages for core stability violations
         if core_stability_violations:
             for violation in core_stability_violations:
                 messages.warning(request, violation)
@@ -1006,20 +880,17 @@ def view_allocation_new(request):
         else:
             messages.success(request, "The assignment is core stable.")
 
-        # Add messages for individual rationality violations
         if individual_rationality_violations:
             for violation in individual_rationality_violations:
                 messages.warning(request, violation)
-            messages.error(
-                request, "The assignment is not individually rational.")
+            messages.error(request, "The assignment is not individually rational.")
         else:
-            messages.success(
-                request, "The assignment is individually rational.")
+            messages.success(request, "The assignment is individually rational.")
 
         return render(request, 'Organizer/new_allocation.html', {
             'participants': participants,
             'individual_stability_violations': individual_stability_violations,
-            # 'core_stability_violations': core_stability_violations,
+            'core_stability_violations': core_stability_violations,
             'individual_rationality_violations': individual_rationality_violations,
         })
 
@@ -1176,106 +1047,119 @@ def edit_allocation_new(request):
 
 
 
+# MCSSP Helper Functions
+def compute_R_values_max(assignments, min_bounds, max_bounds):
+    """
+    Compute the R values for each activity.
+    R represents the range of feasible numbers of participants that can be moved from each activity,
+    considering both minimum and maximum bounds.
+    """
+    R = {}
+    for activity in set(assignments.values()):
+        current_count = len([k for k in assignments.values() if k == activity])
+        min_count = min_bounds[activity]
+        max_count = max_bounds[activity]
+
+        # Generate R values considering both lower and upper bounds
+        R[activity] = [0]
+        for h in range(1, current_count + 1):
+            if (current_count - h) >= min_count and (current_count - h) <= max_count:
+                R[activity].append(h)
+    
+    return R
+
+def find_b_Wbar_r_max(R, c):
+    """Calculate breakpoint 'b', total weight 'Wbar', and maximum weight 'r' using R values."""
+    k = len(R)
+    b = 1
+    Wbar = 0
+    while b <= k:
+        # Calculate sums for beta and alpha
+        beta_sum = sum(max(R[cls]) for cls in range(b))  # Sum of maximum values for first b activities
+        alpha_sum = sum(min(R[cls]) for cls in range(b, k))  # Sum of minimum values for remaining activities
+        total_sum = beta_sum + alpha_sum
+
+        # Check if total sum exceeds the capacity c
+        if total_sum > c:
+            break
+        Wbar = beta_sum  # Update Wbar if the sum doesn't exceed capacity
+        b += 1
+
+    r = max(max(R[i]) for i in range(k))  # Calculate the maximum value across all R values
+    return b, Wbar, r
+
+def algorithm_mcssp_max(R, c):
+    """Implement MCSSP using dynamic programming to determine feasible reassignments using R values."""
+    k = len(R)
+    b, Wbar, r = find_b_Wbar_r_max(R, c)
+
+    S = [[0] * (c + r + 1) for _ in range(k + 1)]
+    for participant_count in range(c - r + 1, c):
+        S[b - 1][participant_count] = 0
+    for participant_count in range(c + 1, c + r + 1):
+        S[b - 1][participant_count] = 1
+    S[b - 1][Wbar] = b
+
+    for t in range(b, k + 1):
+        for participant_count in range(c - r + 1, c + r + 1):
+            S[t][participant_count] = S[t - 1][participant_count]
+
+        max_weight = max(R[t - 1])
+        for participant_count in range(c - r + 1, c + 1):
+            for i in R[t - 1]:
+                new_count = participant_count + i - min(R[t - 1])
+                if 0 <= new_count < len(S[t]):
+                    S[t][new_count] = max(S[t][new_count], S[t - 1][participant_count])
+
+        for participant_count in range(c + max_weight, c, -1):
+            for j in range(S[t - 1][participant_count], S[t][participant_count]):
+                for i in R[j - 1]:
+                    new_count = participant_count + i - max(R[j - 1])
+                    if 0 <= new_count < len(S[t]):
+                        S[t][new_count] = max(S[t][new_count], j)
+
+    column_C_values = [S[row][c] for row in range(b - 1, k + 1)]
+    optimal_solution = max(column_C_values)
+    return optimal_solution
+
+# Activity Allocation Algorithm
 def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, participants, events):
     # Create the LP problem
     prob = LpProblem("ActivityAssignment", LpMaximize)
 
     # Decision variables
     # x[i][j] = 1 if participant i is assigned to activity j
-    x = LpVariable.dicts("x", (range(n), range(a)), cat=LpBinary)
+    x = LpVariable.dicts("x", (range(n), range(a)), cat='Binary')
     # y[j] = 1 if activity j is assigned
-    y = LpVariable.dicts("y", range(a), cat=LpBinary)
+    y = LpVariable.dicts("y", range(a), cat='Binary')
 
     # Objective function: Maximize total preference sum
-    prob += lpSum(Preferences[i][j] * x[i][j] for i in range(n)
-                  for j in range(a)), "TotalPreferenceSum"
+    prob += lpSum(Preferences[i][j] * x[i][j] for i in range(n) for j in range(a)), "TotalPreferenceSum"
 
     # Constraints
-
-    # Each participant can be assigned to at most one activity
     for i in range(n):
-        prob += lpSum(x[i][j]
-                      for j in range(a)) <= 1, f"Participant_{i}_Assignment"
-
-    # Ensure each activity j has the correct number of participants assigned within bounds
+        prob += lpSum(x[i][j] for j in range(a)) <= 1, f"Participant_{i}_Assignment"
     for j in range(a):
-        prob += min_bounds[j] * y[j] <= lpSum(x[i][j]
-                                              for i in range(n)), f"Min_Participants_Activity_{j}"
-        prob += lpSum(x[i][j] for i in range(n)) <= max_bounds[j] * \
-            y[j], f"Max_Participants_Activity_{j}"
-
-    # Ensure correct values for assigned activities
+        prob += min_bounds[j] * y[j] <= lpSum(x[i][j] for i in range(n)), f"Min_Participants_Activity_{j}"
+        prob += lpSum(x[i][j] for i in range(n)) <= max_bounds[j] * y[j], f"Max_Participants_Activity_{j}"
     for j in range(a):
-        prob += lpSum(x[i][j]
-                      for i in range(n)) >= y[j], f"Activity_{j}_Activation"
+        prob += lpSum(x[i][j] for i in range(n)) >= y[j], f"Activity_{j}_Activation"
 
     # Solve the problem
     prob.solve()
 
     # Output results
-    assignments = []
-    for i in range(n):
-        for j in range(a):
-            if value(x[i][j]) > 0.5:  # Because variables are binary, this checks if they are 1
-                assignments.append((i, j))
-
+    assignments = [(i, j) for i in range(n) for j in range(a) if value(x[i][j]) > 0.5]
     assigned_activities = [j for j in range(a) if value(y[j]) > 0.5]
 
-    # Mapping indices to names
-    participant_names = [p.name for p in participants]
-    event_names = [e.name for e in events]
-
-    # Check for individual stability
-    individual_stability_violations = []
-    individual_rationality_violations = []
-    core_stability_violations = []
-    for i in range(n):
-        assigned_event = next(
-            (j for j in range(a) if value(x[i][j]) > 0.5), None)
-        if assigned_event is None:
-            continue
-
-        # Check Individual Stability
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event] and value(x[i][j]) == 0:
-                individual_stability_violations.append(
-                    f"{participant_names[i]} can improve by switching from  {event_names[assigned_event]} to  {event_names[j]}."
-                )
-
-        # Check Individual Rationality
-        if Preferences[i][assigned_event] <= 0:
-            individual_rationality_violations.append(
-                f" {participant_names[i]} is not individually rational in their assigned  {event_names[assigned_event]}."
-            )
-
-        # Check Core Stability
-        for j in range(a):
-            if Preferences[i][j] > Preferences[i][assigned_event] and value(x[i][j]) == 0:
-                can_switch = True
-                for k in range(n):
-                    if value(x[k][j]) > 0.5 and Preferences[k][assigned_event] > Preferences[k][j]:
-                        can_switch = False
-                        break
-                if can_switch:
-                    core_stability_violations.append(
-                        f" {participant_names[i]} and others can jointly benefit by switching to  {event_names[j]}."
-                    )
-
-    return (assignments, assigned_activities,
-            individual_stability_violations, core_stability_violations,
-            individual_rationality_violations)
-
+    return assignments, assigned_activities
 
 @login_required
 def allocate_activities_max(request):
     try:
-        # Get the events created by the current user (organizer)
+        # Get events and participants
         events = Event.objects.filter(created_by=request.user)
-
-        # Filter participants who have given preferences to any of these events
-        participants = Participant.objects.filter(
-            participantactivity__event__in=events
-        ).distinct()
+        participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
 
         # Prepare data for optimization
         n = participants.count()
@@ -1295,18 +1179,12 @@ def allocate_activities_max(request):
             preferences = []
             participant_names.append(participant.name)
             for event in events:
-                activity_preference = ParticipantActivity.objects.filter(
-                    participant=participant, event=event).first()
-                preferences.append(
-                    activity_preference.preference if activity_preference else 0)
+                activity_preference = ParticipantActivity.objects.filter(participant=participant, event=event).first()
+                preferences.append(activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
 
-        
-
         # Solve the assignment problem
-        (assignments, assigned_activities,
-         individual_stability_violations, core_stability_violations,
-         individual_rationality_violations) = solve_activity_assignment_max(
+        assignments, assigned_activities = solve_activity_assignment_max(
             n, a, min_bounds, max_bounds, Preferences, participants, events
         )
 
@@ -1318,62 +1196,63 @@ def allocate_activities_max(request):
                 participant.assigned_to_max = event
                 participant.save()
 
-        # Calculate total preferences for each event
-        total_preferences = [0] * a
+        # Core Stability, Individual Stability, and Rationality Checks
+        individual_stability_violations = []
+        core_stability_violations = []
+        individual_rationality_violations = []
+
+        assignment_dict = {i: j for i, j in assignments}
+        R_values = compute_R_values_max(assignment_dict, min_bounds, max_bounds)
+
         for i in range(n):
+            assigned_event_idx = assignment_dict.get(i)
+            if assigned_event_idx is None:
+                continue
+
+            # Check Individual Stability
             for j in range(a):
-                total_preferences[j] += Preferences[i][j]
+                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                    individual_stability_violations.append(
+                        f"{participant_names[i]} can improve by switching from {event_names[assigned_event_idx]} to {event_names[j]}."
+                    )
 
-        # Find the most and least interested activities
-        max_pref_value = max(total_preferences)
-        min_pref_value = min(total_preferences)
+            # Check Individual Rationality
+            if Preferences[i][assigned_event_idx] <= 0:
+                individual_rationality_violations.append(
+                    f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
+                )
 
-        max_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == max_pref_value]
-        min_pref_events = [event_names[j] for j in range(a) if total_preferences[j] == min_pref_value]
+            # Check Core Stability using MCSSP
+            for j in range(a):
+                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                    if algorithm_mcssp_max(R_values, max_bounds[j]) > 0:
+                        core_stability_violations.append(
+                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+                        )
 
-        # Check if all participants are allocated
-        if len(assignments) == n:
-            messages.success(
-                request, "All participants are involved in the allocation.")
+        # Display results of the allocation and stability checks
+        if individual_stability_violations:
+            for violation in individual_stability_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not individually stable.")
         else:
-            messages.warning(
-                request, "Not all participants are involved in the allocation.")
+            messages.success(request, "The assignment is individually stable.")
 
-        # Check if all events have at least one participant
-        if len(assigned_activities) == a:
-            messages.success(
-                request, "All events have at least one participant.")
+        if core_stability_violations:
+            for violation in core_stability_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not core stable.")
         else:
-            messages.warning(request, "Not all events have participants.")
+            messages.success(request, "The assignment is core stable.")
 
-        # Display Most Interested Activity and Least Interested Activity
-        messages.info(request, f"Activity assigned with highest pref. Value: {', '.join(max_pref_events)}")
-        messages.info(request, f"Activity assigned with lowest pref. Value: {', '.join(min_pref_events)}")
+        if individual_rationality_violations:
+            for violation in individual_rationality_violations:
+                messages.warning(request, violation)
+            messages.error(request, "The assignment is not individually rational.")
+        else:
+            messages.success(request, "The assignment is individually rational.")
 
-        # Provide feedback on individual stability
-        # if individual_stability_violations:
-        #     for violation in individual_stability_violations:
-        #         messages.warning(request, violation)
-        #     messages.error(request, "The assignment is not individually stable.")
-        # else:
-        #     messages.success(request, "The assignment is individually stable.")
-
-        # Provide feedback on core stability
-        # if core_stability_violations:
-        #     for violation in core_stability_violations:
-        #         messages.warning(request, violation)
-        #     messages.error(request, "The assignment is not core stable.")
-        # else:
-        #     messages.success(request, "The assignment is core stable.")
-
-        # Provide feedback on individual rationality
-        # if individual_rationality_violations:
-        #     for violation in individual_rationality_violations:
-        #         messages.warning(request, violation)
-        #     messages.error(request, "The assignment is not individually rational.")
-        # else:
-        #     messages.success(request, "The assignment is individually rational.")
-
+        # Redirect to view allocation page
         return redirect('view_allocation_max')
 
     except Exception as e:
@@ -1397,6 +1276,10 @@ def view_allocation_max(request):
         n = participants.count()
         a = events.count()
 
+        if n == 0 or a == 0:
+            messages.warning(request, "No participants or events available for viewing.")
+            return redirect('home')
+
         # Get the min and max bounds for events
         min_bounds = list(events.values_list('min_participants', flat=True))
         max_bounds = list(events.values_list('max_participants', flat=True))
@@ -1406,24 +1289,23 @@ def view_allocation_max(request):
         assignment_dict = {}
         assignments = []  # Store current assignments
 
+        # Gather the preferences and assignments for each participant
         for idx, participant in enumerate(participants):
             preferences = []
             # Assuming "assigned_to_max" holds the new assignment
             assigned_event = participant.assigned_to_max
-            assigned_event_idx = list(events).index(
-                assigned_event) if assigned_event in events else None
+            assigned_event_idx = list(events).index(assigned_event) if assigned_event in events else None
             if assigned_event_idx is not None:
                 assignment_dict[idx] = assigned_event_idx
-                assignments.append((idx, assigned_event_idx))  # Add current assignment
+                assignments.append((idx, assigned_event_idx))
 
             for event in events:
                 activity_preference = ParticipantActivity.objects.filter(
                     participant=participant, event=event).first()
-                preferences.append(
-                    activity_preference.preference if activity_preference else 0)
+                preferences.append(activity_preference.preference if activity_preference else 0)
             Preferences.append(preferences)
 
-        # Check for individual stability, core stability, and individual rationality
+        # Initialize lists to hold stability violations
         individual_stability_violations = []
         core_stability_violations = []
         individual_rationality_violations = []
@@ -1431,7 +1313,7 @@ def view_allocation_max(request):
         participant_names = [p.name for p in participants]
         event_names = [e.name for e in events]
 
-        # Check individual stability and individual rationality
+        # **Individual Stability Check**
         for i in range(n):
             assigned_event_idx = assignment_dict.get(i, None)
             if assigned_event_idx is None:
@@ -1444,33 +1326,40 @@ def view_allocation_max(request):
                         f"{participant_names[i]} can improve by switching from {event_names[assigned_event_idx]} to {event_names[j]}."
                     )
 
-            # Check Individual Rationality
+            # **Individual Rationality Check**
             if Preferences[i][assigned_event_idx] <= 0:
                 individual_rationality_violations.append(
                     f"{participant_names[i]} is not individually rational in their assigned {event_names[assigned_event_idx]}."
                 )
 
-        # Core stability check using the core_stability_check function
-        assignments, core_stability_violations = core_stability_check(
-    n, a, assignment_dict, Preferences, min_bounds, max_bounds
-)
+        # **Core Stability Check**
+        # Use the updated core stability algorithm to check for possible reallocations
+        R_values = compute_R_values_max(assignment_dict, min_bounds, max_bounds)  # Compute R values for core stability check
+        for i in range(n):
+            assigned_event_idx = assignment_dict.get(i, None)
+            if assigned_event_idx is None:
+                continue
 
-        # core_stability_violations = []
-        # for i, j in core_stability_results:
-        #     core_stability_violations.append(
-        #         f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
-        #     )
+            # Find activities where the participant would prefer to switch
+            for j in range(a):
+                if Preferences[i][j] > Preferences[i][assigned_event_idx] and j != assigned_event_idx:
+                    # Check if a coalition of participants can move to make this switch possible
+                    if algorithm_mcssp_max(R_values, max_bounds[j]) > 0:
+                        core_stability_violations.append(
+                            f"{participant_names[i]} and others can jointly benefit by switching to {event_names[j]}."
+                        )
 
-        # Add messages for individual stability violations
+        # **Messages for Stability Violations**
+
+        # Display messages for individual stability violations
         if individual_stability_violations:
             for violation in individual_stability_violations:
                 messages.warning(request, violation)
-            messages.error(
-                request, "The assignment is not individually stable.")
+            messages.error(request, "The assignment is not individually stable.")
         else:
             messages.success(request, "The assignment is individually stable.")
 
-        # Add messages for core stability violations
+        # Display messages for core stability violations
         if core_stability_violations:
             for violation in core_stability_violations:
                 messages.warning(request, violation)
@@ -1478,16 +1367,15 @@ def view_allocation_max(request):
         else:
             messages.success(request, "The assignment is core stable.")
 
-        # Add messages for individual rationality violations
+        # Display messages for individual rationality violations
         if individual_rationality_violations:
             for violation in individual_rationality_violations:
                 messages.warning(request, violation)
-            messages.error(
-                request, "The assignment is not individually rational.")
+            messages.error(request, "The assignment is not individually rational.")
         else:
-            messages.success(
-                request, "The assignment is individually rational.")
+            messages.success(request, "The assignment is individually rational.")
 
+        # Render the results to the template
         return render(request, 'Organizer/max_allocation.html', {
             'participants': participants,
             'individual_stability_violations': individual_stability_violations,
