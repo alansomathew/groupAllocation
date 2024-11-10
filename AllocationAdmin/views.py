@@ -378,7 +378,7 @@ def view_allocation(request):
 
         # Verify individual stability and rationality
         for i, participant in enumerate(participants):
-            assigned_event = assignments[i][1] if assignments and i < len(assignments) else None
+            assigned_event = participants[i].assigned_to.name if participants[i].assigned_to else None
             if assigned_event:
                 assigned_event_idx = event_names.index(assigned_event)
                 
