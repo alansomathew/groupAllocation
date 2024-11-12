@@ -239,56 +239,37 @@ def solve_activity_assignment(n, a, min_bounds, max_bounds, Preferences, partici
     model = LpProblem("ActivityAssignment", LpMaximize)
 
     # Decision variables
-    x = LpVariable.dicts("x", ((i, j) for i in range(n)
-                         for j in range(a)), cat=LpBinary)
+    x = LpVariable.dicts("x", ((i, j) for i in range(n) for j in range(a)), cat=LpBinary)
     y = LpVariable.dicts("y", (j for j in range(a)), cat=LpBinary)
 
-    # Normalize preferences
     normalized_preferences = [
         [min(1, max(0, Preferences[i][j])) for j in range(a)] for i in range(n)]
 
     # Objective function
-    model += lpSum(normalized_preferences[i][j] * x[i, j]
+    model += lpSum(Preferences[i][j] * x[i, j]
                    for i in range(n) for j in range(a))
 
     # Constraints
     # Each participant must be assigned to at most one activity
     for i in range(n):
-            model += lpSum(x[i, j] for j in range(a)) <= 1
+        model += lpSum(x[i, j] for j in range(a)) == 1
 
-    # Ensure each activity j has the correct number of participants assigned within bounds
+    # Ensure each activity has the correct number of participants within bounds
     for j in range(a):
         model += min_bounds[j] * y[j] <= lpSum(x[i, j] for i in range(n))
         model += lpSum(x[i, j] for i in range(n)) <= max_bounds[j] * y[j]
+        model += y[j] <= 1
 
-    # Preference constraints: Ensure a participant is not assigned to activities with negative preferences
-    for i in range(n):
-        model += lpSum(normalized_preferences[i]
-                       [j] * x[i, j] for j in range(a)) >= 0
-
-    # Ensure correct values for assigned activities
-    for j in range(a):
-        model += lpSum(x[i, j] for i in range(n)) >= y[j]
-
-    # Optimize the model
+    # Solve the model
     model.solve()
 
     # Check if the solution is optimal
     if LpStatus[model.status] != "Optimal":
-        # No feasible solution was found
-        return None, None  # Or handle the error as appropriate
+        return None, None
 
-    # Collect assignments and assigned activities
-    assignments = [(i, j) for i in range(n) for j in range(a) if x[i, j].varValue > 0.5]
-    assigned_activities = [j for j in range(a) if y[j].varValue > 0.5]
-
-    # Mapping indices to names
-    participant_assignments = [(participant_names[i], event_names[j]) for i, j in assignments]
-    activity_names = [event_names[j] for j in assigned_activities]
-
-    print(activity_names, participant_assignments)  # Debug output to see results
-
-    return participant_assignments, activity_names
+    # Collect assignments
+    assignments = [(participant_names[i], event_names[j]) for i in range(n) for j in range(a) if x[i, j].varValue > 0.5]
+    return assignments
 
 
 @login_required
@@ -321,7 +302,7 @@ def allocate_participants_to_activities(request):
         Preferences.append(preferences)
 
     # Solve the core stability problem with ILP
-    assignments, assigned_activities = solve_activity_assignment(
+    assignments = solve_activity_assignment(
         n, a, min_bounds, max_bounds, Preferences, participant_names, event_names,
     )
 
@@ -345,17 +326,14 @@ def allocate_participants_to_activities(request):
 @login_required
 def view_allocation(request):
     try:
-        # Get events and participants
         events = Event.objects.filter(created_by=request.user)
         participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
 
-        # Prepare event and participant data
         event_names = [event.name for event in events]
         participant_names = [participant.name for participant in participants]
         min_bounds = list(events.values_list('min_participants', flat=True))
         max_bounds = list(events.values_list('max_participants', flat=True))
 
-        # Load participant preferences
         Preferences = []
         for participant in participants:
             preferences = [
@@ -364,98 +342,57 @@ def view_allocation(request):
             ]
             Preferences.append(preferences)
 
-        # Perform core stability checks using the ILP model
-        assignments, assigned_activities = solve_activity_assignment(
-            len(participants), len(events), min_bounds, max_bounds, Preferences, participant_names, event_names
-        )
-
-        if assignments is None:
-            messages.error(request, "No feasible core stable solution found.")
-            return redirect('view_allocation')
-
         # Initialize violation lists
         individual_stability_violations = []
         individual_rationality_violations = []
         core_stability_violations = []
 
-        # Verify individual stability and rationality
-        # Validate each participant's assignment
+        # Verify individual stability, rationality, and core stability
         for i, participant in enumerate(participants):
-            # Get the assigned event name or default to "Unassigned" if not set
-            assigned_event = participant.assigned_to.name if participant.assigned_to else None
-            
-            # Check if the assigned event exists in event names and retrieve its index if it does
-            assigned_event_idx = event_names.index(assigned_event) if assigned_event in event_names else None
-            
-            # Skip processing if the assigned_event_idx is None
-            if assigned_event_idx is None:
-                continue  # Move to the next participant if there is no valid assigned event
-            
-            # Find the best higher-preference event than the assigned one
-            best_option_idx = None
-            highest_preference = Preferences[i][assigned_event_idx]
-            
-            for j, event_name in enumerate(event_names):
-                # Skip the assigned event and find higher-preference events
-                if Preferences[i][j] > highest_preference and event_name != assigned_event:
-                    best_option_idx = j
-                    highest_preference = Preferences[i][j]
+            # Get the assigned event from the saved `assigned_to` field
+            assigned_event = participant.assigned_to
+            assigned_event_name = assigned_event.name if assigned_event else None
+            assigned_event_idx = event_names.index(assigned_event_name) if assigned_event_name else None
+            preference_assigned_event = Preferences[i][assigned_event_idx] if assigned_event_idx is not None else None
 
-            # Only add the best option as an individual stability violation if it exists
-            if best_option_idx is not None:
-                individual_stability_violations.append(
-                    f"{participant_names[i]} can improve by switching from {assigned_event} to {event_names[best_option_idx]}."
-                )
+            if preference_assigned_event is not None:
+                # Individual Rationality Check
+                if preference_assigned_event <= 0:
+                    individual_rationality_violations.append(
+                        f"{participant_names[i]} is not individually rational in {assigned_event_name}."
+                    )
 
-            # Check if the participant’s assigned event has a non-positive preference
-            if Preferences[i][assigned_event_idx] <= 0:
-                individual_rationality_violations.append(
-                    f"{participant_names[i]} is not individually rational in their assigned {assigned_event}."
-                )
-
-
-
-        # Core stability verification with coalition message for unsatisfied participants
-        for i in range(len(participants)):
-            assigned_event = participants[i].assigned_to.name if participants[i].assigned_to else None
-            assigned_event_idx = event_names.index(assigned_event) if assigned_event in event_names else None
-            
-            if assigned_event_idx is None:
-                continue  # Skip this participant if they do not have a valid assigned event
-
-            for j in range(len(events)):
-                if Preferences[i][j] > Preferences[i][assigned_event_idx] and event_names[j] != assigned_event:
-                    target_event_idx = j
-
-                    # Filter coalition participants from the current assigned event
-                    coalition_from_current_event = [
-                        k for k in range(len(participants))
-                        if k < len(assignments) and  # Ensure k is a valid index in assignments
-                        len(assignments[k]) > 1 and  # Ensure assignments[k] has enough items
-                        assignments[k][1] == assigned_event and Preferences[k][target_event_idx] > 0
-                    ]
-
-                    # Filter participants already in the target event
-                    coalition_from_target_event = [
-                        k for k in range(len(participants))
-                        if k < len(assignments) and  # Ensure k is a valid index in assignments
-                        len(assignments[k]) > 1 and  # Ensure assignments[k] has enough items
-                        assignments[k][1] == event_names[target_event_idx]
-                    ]
-
-                    # Calculate the total number of participants in the target event after the potential move
-                    total_after_move = len(coalition_from_target_event) + len(coalition_from_current_event) + 1
-
-                    # Check if the move is feasible under capacity constraints
-                    if min_bounds[target_event_idx] <= total_after_move <= max_bounds[target_event_idx]:
-                        core_stability_violations.append(
-                            f"{participant_names[i]} moves to {event_names[target_event_idx]} with a coalition of "
-                            f"{len(coalition_from_current_event)} participants from {assigned_event} and "
-                            f"{len(coalition_from_target_event)} participant(s) from {event_names[target_event_idx]}."
+                # Individual Stability Check
+                for j, event_name in enumerate(event_names):
+                    if Preferences[i][j] > preference_assigned_event:
+                        individual_stability_violations.append(
+                            f"{participant_names[i]} can improve by switching from {assigned_event_name} to {event_name}."
                         )
+                        break
 
+                # Core Stability Check
+                for j, event_name in enumerate(event_names):
+                    if Preferences[i][j] > preference_assigned_event:
+                        target_event_idx = j
+                        coalition_from_current_event = [
+                            k for k in range(len(participants))
+                            if participants[k].assigned_to.name == assigned_event_name and Preferences[k][target_event_idx] > 0
+                        ]
+                        coalition_from_target_event = [
+                            k for k in range(len(participants))
+                            if participants[k].assigned_to.name == event_names[target_event_idx]
+                        ]
 
-        # Display stability results
+                        total_after_move = len(coalition_from_target_event) + len(coalition_from_current_event) + 1
+                        if min_bounds[target_event_idx] <= total_after_move <= max_bounds[target_event_idx]:
+                            core_stability_violations.append(
+                                f"{participant_names[i]} could improve by moving to {event_names[target_event_idx]} with a coalition of "
+                                f"{len(coalition_from_current_event)} participants from {assigned_event_name} and "
+                                f"{len(coalition_from_target_event)} participant(s) from {event_names[target_event_idx]}."
+                            )
+                        break
+
+        # Display results
         if individual_stability_violations:
             for violation in individual_stability_violations:
                 messages.warning(request, violation)
@@ -586,7 +523,7 @@ def allocate_participants_new(request):
 
 @login_required
 def view_allocation_new(request):
-    # try:
+    try:
         # Get the events created by the current user (organizer)
         events = Event.objects.filter(created_by=request.user)
         participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
@@ -623,78 +560,48 @@ def view_allocation_new(request):
 
         # Validate each participant's assignment
         for i, participant in enumerate(participants):
-            # Get the assigned event name or default to "Unassigned" if not set
-            assigned_event = participant.assigned_to_new.name if participant.assigned_to_new else None
-            
-            # Check if the assigned event exists in event names and retrieve its index if it does
-            assigned_event_idx = event_names.index(assigned_event) if assigned_event in event_names else None
-            
-            # Skip processing if the assigned_event_idx is None
-            if assigned_event_idx is None:
-                continue  # Move to the next participant if there is no valid assigned event
-            
-            # Find the best higher-preference event than the assigned one
-            best_option_idx = None
-            highest_preference = Preferences[i][assigned_event_idx]
-            
-            for j, event_name in enumerate(event_names):
-                # Skip the assigned event and find higher-preference events
-                if Preferences[i][j] > highest_preference and event_name != assigned_event:
-                    best_option_idx = j
-                    highest_preference = Preferences[i][j]
+            # Get the assigned event from the saved `assigned_to` field
+            assigned_event = participant.assigned_to
+            assigned_event_name = assigned_event.name if assigned_event else None
+            assigned_event_idx = event_names.index(assigned_event_name) if assigned_event_name else None
+            preference_assigned_event = Preferences[i][assigned_event_idx] if assigned_event_idx is not None else None
 
-            # Only add the best option as an individual stability violation if it exists
-            if best_option_idx is not None:
-                individual_stability_violations.append(
-                    f"{participant_names[i]} can improve by switching from {assigned_event} to {event_names[best_option_idx]}."
-                )
+            if preference_assigned_event is not None:
+                # Individual Rationality Check
+                if preference_assigned_event <= 0:
+                    individual_rationality_violations.append(
+                        f"{participant_names[i]} is not individually rational in {assigned_event_name}."
+                    )
 
-            # Check if the participant’s assigned event has a non-positive preference
-            if Preferences[i][assigned_event_idx] <= 0:
-                individual_rationality_violations.append(
-                    f"{participant_names[i]} is not individually rational in their assigned {assigned_event}."
-                )
-
-
-
-        # Core stability verification with coalition message for unsatisfied participants
-        for i in range(len(participants)):
-            assigned_event = participants[i].assigned_to_new.name if participants[i].assigned_to_new else "Unassigned"
-            assigned_event_idx = event_names.index(assigned_event) if assigned_event in event_names else None
-            
-            if assigned_event_idx is None:
-                continue  # Skip this participant if they do not have a valid assigned event
-
-            for j in range(len(events)):
-                if Preferences[i][j] > Preferences[i][assigned_event_idx] and event_names[j] != assigned_event:
-                    target_event_idx = j
-
-                    # Filter coalition participants from the current assigned event
-                    coalition_from_current_event = [
-                        k for k in range(len(participants))
-                        if k < len(assignments) and  # Ensure k is a valid index in assignments
-                        len(assignments[k]) > 1 and  # Ensure assignments[k] has enough items
-                        assignments[k][1] == assigned_event and Preferences[k][target_event_idx] > 0
-                    ]
-
-                    # Filter participants already in the target event
-                    coalition_from_target_event = [
-                        k for k in range(len(participants))
-                        if k < len(assignments) and  # Ensure k is a valid index in assignments
-                        len(assignments[k]) > 1 and  # Ensure assignments[k] has enough items
-                        assignments[k][1] == event_names[target_event_idx]
-                    ]
-
-                    # Calculate the total number of participants in the target event after the potential move
-                    total_after_move = len(coalition_from_target_event) + len(coalition_from_current_event) + 1
-
-                    # Check if the move is feasible under capacity constraints
-                    if min_bounds[target_event_idx] <= total_after_move <= max_bounds[target_event_idx]:
-                        core_stability_violations.append(
-                            f"{participant_names[i]} moves to {event_names[target_event_idx]} with a coalition of "
-                            f"{len(coalition_from_current_event)} participants from {assigned_event} and "
-                            f"{len(coalition_from_target_event)} participant(s) from {event_names[target_event_idx]}."
+                # Individual Stability Check
+                for j, event_name in enumerate(event_names):
+                    if Preferences[i][j] > preference_assigned_event:
+                        individual_stability_violations.append(
+                            f"{participant_names[i]} can improve by switching from {assigned_event_name} to {event_name}."
                         )
+                        break
+
+                # Core Stability Check
+                for j, event_name in enumerate(event_names):
+                    if Preferences[i][j] > preference_assigned_event:
+                        target_event_idx = j
+                        coalition_from_current_event = [
+                            k for k in range(len(participants))
+                            if participants[k].assigned_to.name == assigned_event_name and Preferences[k][target_event_idx] > 0
+                        ]
+                        coalition_from_target_event = [
+                            k for k in range(len(participants))
+                            if participants[k].assigned_to.name == event_names[target_event_idx]
+                        ]
+
+                        total_after_move = len(coalition_from_target_event) + len(coalition_from_current_event) + 1
+                        if min_bounds[target_event_idx] <= total_after_move <= max_bounds[target_event_idx]:
+                            core_stability_violations.append(
+                                f"{participant_names[i]} could improve by moving to {event_names[target_event_idx]} with a coalition of "
+                                f"{len(coalition_from_current_event)} participants from {assigned_event_name} and "
+                                f"{len(coalition_from_target_event)} participant(s) from {event_names[target_event_idx]}."
+                            )
+                        break
 
 
         # Process violation messages
@@ -726,10 +633,10 @@ def view_allocation_new(request):
             'individual_rationality_violations': individual_rationality_violations,
         })
 
-    # except Exception as e:
-    #     print(e)
-    #     messages.error(request, 'Error viewing allocations!')
-    #     return render(request, 'Organizer/new_allocation.html')
+    except Exception as e:
+        print(e)
+        messages.error(request, 'Error viewing allocations!')
+        return render(request, 'Organizer/new_allocation.html')
 
 
 def edit_allocation(request):
@@ -916,7 +823,7 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
 
 @login_required
 def allocate_activities_max(request):
-    # try:
+    try:
         # Get events and participants
         events = Event.objects.filter(created_by=request.user)
         participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
@@ -955,10 +862,10 @@ def allocate_activities_max(request):
         messages.success(request, "Core stable assignment has been successfully calculated and saved.")
         return redirect('view_allocation_max')
 
-    # except Exception as e:
-    #     print(e)
-    #     messages.error(request, 'Error during the allocation process!')
-    #     return redirect('view_allocation_max')
+    except Exception as e:
+        print(e)
+        messages.error(request, 'Error during the allocation process!')
+        return redirect('view_allocation_max')
 
 
 @login_required
@@ -1005,79 +912,48 @@ def view_allocation_max(request):
         event_names = [e.name for e in events]
 
         for i, participant in enumerate(participants):
-            assigned_event = participants[i].assigned_to_max.name if participants[i].assigned_to_max else None
-            if assigned_event:
-                assigned_event_idx = event_names.index(assigned_event)
+            # Get the assigned event from the saved `assigned_to` field
+            assigned_event = participant.assigned_to
+            assigned_event_name = assigned_event.name if assigned_event else None
+            assigned_event_idx = event_names.index(assigned_event_name) if assigned_event_name else None
+            preference_assigned_event = Preferences[i][assigned_event_idx] if assigned_event_idx is not None else None
 
-                # Find the best higher-preference event than the assigned one
-                best_option_idx = None
-                highest_preference = Preferences[i][assigned_event_idx]
-                for j, event_name in enumerate(event_names):
-                    if Preferences[i][j] > highest_preference and event_name != assigned_event:
-                        best_option_idx = j
-                        highest_preference = Preferences[i][j]
-
-                # Only add the best option as an individual stability violation
-                if best_option_idx is not None:
-                    individual_stability_violations.append(
-                        f"{participant_names[i]} can improve by switching from {assigned_event} to {event_names[best_option_idx]}."
-                    )
-
-                # Check if the participant’s assigned event has a non-positive preference
-                if Preferences[i][assigned_event_idx] <= 0:
+            if preference_assigned_event is not None:
+                # Individual Rationality Check
+                if preference_assigned_event <= 0:
                     individual_rationality_violations.append(
-                        f"{participant_names[i]} is not individually rational in their assigned {assigned_event}."
+                        f"{participant_names[i]} is not individually rational in {assigned_event_name}."
                     )
 
-        # Core stability verification with coalition message for unsatisfied participants
-        for i in range(len(participants)):
-            # Retrieve the participant's assigned event name from the assigned_to_max field
-            assigned_event = participants[i].assigned_to_max.name if participants[i].assigned_to_max else None
-            
-            # Only get the index if the assigned event exists in event names
-            assigned_event_idx = event_names.index(assigned_event) if assigned_event in event_names else None
-            
-            # Skip further processing if assigned_event_idx is None
-            if assigned_event_idx is None:
-                continue  # Move to the next participant if there is no valid assigned event
-
-            # Display the participant's name, assigned event, and preferences for debugging purposes
-            print(participant_names[i])  # Participant's name
-            print(f"Assigned Event: {assigned_event}")  # Assigned event
-            print(f"Assigned Event Index: {assigned_event_idx}")  # Assigned event index in event_names list
-            print(f"Assigned Event Preference: {Preferences[i][assigned_event_idx]}")  # Preference for assigned event
-            print(f"All Preferences: {Preferences[i]}")  # All preferences for this participant
-
-            # Skip core stability check if the assigned event is the highest preference for this participant
-            if Preferences[i][assigned_event_idx] == max(Preferences[i]):
-                continue  # Participant is assigned to their highest preference event, no violation to report
-
-            # Only proceed if participant's assignment is not fully aligned with their preferences
-            for j in range(len(events)):
-                if Preferences[i][j] > Preferences[i][assigned_event_idx] and event_names[j] != assigned_event:
-                    # Determine if a coalition is feasible for this participant to move to a higher-preference event
-                    target_event_idx = j
-                    coalition_from_current_event = [
-                        k for k in range(len(participants))
-                        if k < len(assignments) and len(assignments[k]) > 1 and
-                        assignments[k][1] == assigned_event and Preferences[k][target_event_idx] > 0
-                    ]
-                    coalition_from_target_event = [
-                        k for k in range(len(participants))
-                        if k < len(assignments) and len(assignments[k]) > 1 and
-                        assignments[k][1] == event_names[target_event_idx]
-                    ]
-
-                    # Calculate the total number of participants in the target event after the potential move
-                    total_after_move = len(coalition_from_target_event) + len(coalition_from_current_event) + 1
-
-                    # Check if the move is feasible under capacity constraints
-                    if min_bounds[target_event_idx] <= total_after_move <= max_bounds[target_event_idx]:
-                        core_stability_violations.append(
-                            f"{participant_names[i]} moves to {event_names[target_event_idx]} with a coalition of "
-                            f"{len(coalition_from_current_event)} participants from {assigned_event} and "
-                            f"{len(coalition_from_target_event)} participant(s) from {event_names[target_event_idx]}."
+                # Individual Stability Check
+                for j, event_name in enumerate(event_names):
+                    if Preferences[i][j] > preference_assigned_event:
+                        individual_stability_violations.append(
+                            f"{participant_names[i]} can improve by switching from {assigned_event_name} to {event_name}."
                         )
+                        break
+
+                # Core Stability Check
+                for j, event_name in enumerate(event_names):
+                    if Preferences[i][j] > preference_assigned_event:
+                        target_event_idx = j
+                        coalition_from_current_event = [
+                            k for k in range(len(participants))
+                            if participants[k].assigned_to.name == assigned_event_name and Preferences[k][target_event_idx] > 0
+                        ]
+                        coalition_from_target_event = [
+                            k for k in range(len(participants))
+                            if participants[k].assigned_to.name == event_names[target_event_idx]
+                        ]
+
+                        total_after_move = len(coalition_from_target_event) + len(coalition_from_current_event) + 1
+                        if min_bounds[target_event_idx] <= total_after_move <= max_bounds[target_event_idx]:
+                            core_stability_violations.append(
+                                f"{participant_names[i]} could improve by moving to {event_names[target_event_idx]} with a coalition of "
+                                f"{len(coalition_from_current_event)} participants from {assigned_event_name} and "
+                                f"{len(coalition_from_target_event)} participant(s) from {event_names[target_event_idx]}."
+                            )
+                        break
 
 
         # Process violation messages
