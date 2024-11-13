@@ -369,7 +369,7 @@ def view_allocation(request):
 
             # 1. **Individual Rationality Check**
             # Check if the participant's assigned event has a non-negative preference
-            if preference_assigned_event <= 0:
+            if preference_assigned_event < 0:
                 individual_rationality_violations.append(
                     f"{participant_names[i]} is not individually rational in {assigned_event_name} (preference {preference_assigned_event})."
                 )
@@ -654,7 +654,7 @@ def view_allocation_new(request):
 
             # 1. **Individual Rationality Check**
             # Check if the participant's assigned event has a non-negative preference
-            if preference_assigned_event <= 0:
+            if preference_assigned_event < 0:
                 individual_rationality_violations.append(
                     f"{participant_names[i]} is not individually rational in {assigned_event_name} (preference {preference_assigned_event})."
                 )
@@ -1074,7 +1074,7 @@ def view_allocation_max(request):
 
             # 1. **Individual Rationality Check**
             # Check if the participant's assigned event has a non-negative preference
-            if preference_assigned_event <= 0:
+            if preference_assigned_event < 0:
                 individual_rationality_violations.append(
                     f"{participant_names[i]} is not individually rational in {assigned_event_name} (preference {preference_assigned_event})."
                 )
