@@ -320,7 +320,6 @@ def allocate_participants_to_activities(request):
             participant.assigned_to = event
             participant.save()
 
-    messages.success(request, "Core stable allocation completed successfully.")
     return redirect('view_allocation')
 
 
@@ -435,15 +434,15 @@ def view_allocation(request):
                     for c_idx, c_name in enumerate(event_names):
                         if c_name != event_name:
                             Rc = set()  # Initialize Rc with feasible move counts
-                            
+
                             # Define participants assigned to activity `c`
                             current_c_participants = [
-                                k for k in range(len(participants)) if participants[k].assigned_to.name == c_name
+                                k for k in range(len(participants)) if participants[k].assigned_to and participants[k].assigned_to.name == c_name
                             ]
-                            
+
                             # Determine eligible participants from `c` who are in `B_set`
                             eligible_to_move_from_c = [p for p in current_c_participants if p in B_set]
-                            
+
                             # Calculate Rc for feasible moves from `c` without violating capacity
                             for h in range(1, len(eligible_to_move_from_c) + 1):
                                 remaining_capacity = len(current_c_participants) - h
@@ -467,19 +466,19 @@ def view_allocation(request):
 
                     # Constraints: Select exactly one feasible value from each R_c
                     for c_name, h_var in h_vars.items():
-                        prob += lpSum(h_var[h] for h in R_sets[c_name]) == 1, f"OneValueFromR_{c_name}"
+                        prob += lpSum(h_var[h] for h in R_sets[c_name]) <= 1, f"OneValueFromR_{c_name}"
 
                     # Capacity constraint for target event `b` after coalition movement
                     total_move_to_b = lpSum(
                         h * h_vars[c_name][h] for c_name in R_sets for h in R_sets[c_name]
                     )
-                    
-                    # Calculate the current number of participants assigned to `b`
+
+                    # Current participants in the target event
                     current_b_participants = len([
-                        k for k in range(len(participants)) if participants[k].assigned_to.name == event_name
+                        k for k in range(len(participants)) if participants[k].assigned_to and participants[k].assigned_to.name == event_name
                     ])
 
-                    # Capacity constraint for the target event
+                    # Capacity constraint
                     prob += (
                         min_bounds[target_event_idx] <= current_b_participants + total_move_to_b <= max_bounds[target_event_idx],
                         "CapacityConstraint_TargetEvent"
@@ -488,9 +487,8 @@ def view_allocation(request):
                     # Solve the ILP model
                     prob.solve()
 
-                    # Check if the solution is feasible
+                    # Process ILP results
                     if LpStatus[prob.status] == 'Optimal':
-                        coalition_found = True
                         coalition_participants = [
                             participant_names[p] for p in B_set if any(h_vars[c_name][h].varValue == 1 for h in R_sets[c_name])
                         ]
@@ -498,11 +496,12 @@ def view_allocation(request):
                             f"{participant_names[i]} could improve by moving to {event_names[target_event_idx]} with a coalition of "
                             f"{', '.join(coalition_participants)} from other activities."
                         )
-                        core_stability_violations.extend(coalition_messages)  # Add violations to the main list
+                        core_stability_violations.extend(coalition_messages)
                     else:
                         no_feasible_coalitions.append(
                             f"No feasible coalition found for {participant_names[i]} to move to {event_names[target_event_idx]}."
                         )
+
 
 
         # Display stability results
@@ -556,7 +555,12 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, pa
     # Constraints
     # Each participant can be assigned to at most one activity
     for i in range(n):
-        model += lpSum(x[i, j] for j in range(a)) <= 1, f"Participant_{i}_Assignment"
+        if all(p < 0 for p in Preferences[i]):  # If all preferences are negative
+            # Ensure no allocation if all preferences are negative
+            model += lpSum(x[i, j] for j in range(a)) == 0, f"Exclude_All_Negative_Participant_{i}"
+        else:
+            # Allow assignment if there is at least one non-negative preference
+            model += lpSum(x[i, j] for j in range(a)) <= 1, f"Participant_{i}_Assignment"
 
     # Capacity constraints for each activity
     for j in range(a):
@@ -576,13 +580,25 @@ def solve_activity_assignment_pulp(n, a, min_bounds, max_bounds, Preferences, pa
     # Solve the model
     model.solve()
 
-    # Collect assignments and assigned activities
-    assignments = [(i, j) for i in range(n) for j in range(a) if x[i, j].varValue > 0.5]
-    assigned_activities = [j for j in range(a) if y[j].varValue > 0.5]
+    # Post-process results
+    assignments = []  # To store participant assignments
+    assigned_activities = [j for j in range(a) if y[j].varValue > 0.5]  # List of active activities
 
     # Mapping indices to names
     participant_names = [p.name for p in participants]
     event_names = [e.name for e in events]
+
+    for i in range(n):
+        assigned_event = None  # Default to None for participants not assigned
+        for j in range(a):
+            if x[i, j].varValue > 0.5:  # Check if the participant is assigned to an activity
+                assigned_event = event_names[j]
+                break
+        # If no assignment, explicitly mark as "None"
+        if assigned_event is None:
+            assignments.append((participant_names[i], "None"))
+        else:
+            assignments.append((participant_names[i], assigned_event))
 
     return assignments, assigned_activities, participant_names, event_names
 
@@ -618,6 +634,8 @@ def allocate_participants_new(request):
             preferences.append(activity_preference.preference if activity_preference else 0)
         Preferences.append(preferences)
 
+    print(Preferences)
+
     # Solve the assignment problem with core stability and negative preference exclusion
     assignments, assigned_activities, _, _ = solve_activity_assignment_pulp(
         n, a, min_bounds, max_bounds, Preferences, participants, events
@@ -625,21 +643,22 @@ def allocate_participants_new(request):
 
     # Update participant assignments in the database
     with transaction.atomic():
-        for participant_idx, event_idx in assignments:
-            participant = participants[participant_idx]
-            event = events[event_idx]
+        for participant_name, event_name in assignments:
+            if event_name == "None":  # Skip if no event is assigned
+                continue
+            # Retrieve participant and event objects using their names
+            participant = participants.get(name=participant_name)
+            event = events.get(name=event_name)
             participant.assigned_to_new = event  # Save new assignment
             participant.save()
 
-    # Success message for assignment completion
-    messages.success(request, "Core stable assignment has been successfully calculated and saved.")
-    
+    # Redirect to the allocation view
     return redirect('view_allocation_new')
 
 
 @login_required
 def view_allocation_new(request):
-    try:
+    # try:
         # Retrieve events and participants created by the current user
         events = Event.objects.filter(created_by=request.user)
         participants = Participant.objects.filter(participantactivity__event__in=events).distinct()
@@ -663,11 +682,15 @@ def view_allocation_new(request):
         
         # Initialize assignments dictionary to keep track of participants assigned to each event
         assignments = {event_name: [] for event_name in event_names}
+        unassigned_participants = set()
         for participant in participants:
-            assigned_event_name = participant.assigned_to_new.name  # Get the assigned event for each participant
-            assignments[assigned_event_name].append(participant)
-
-        print(assignments)  # Debugging output to check assignments structure
+            # Check if the participant has been assigned to an event
+            if participant.assigned_to_new:
+                assigned_event_name = participant.assigned_to_new.name  # Get the assigned event for the participant
+                assignments[assigned_event_name].append(participant)
+            else:
+                # Handle unassigned participants
+                unassigned_participants.add(participant.name)
 
         # Initialize lists for stability violations
         individual_stability_violations = []
@@ -707,9 +730,17 @@ def view_allocation_new(request):
 
         # Core Stability Check
         for i, participant in enumerate(participants):
-            assigned_event_name = participant.assigned_to_new.name  # Current assigned event for participant
-            assigned_event_idx = event_names.index(assigned_event_name)  # Index of assigned event in event_names list
-            preference_assigned_event = Preferences[i][assigned_event_idx]  # Preference value for assigned event
+            if participant.assigned_to_new:
+                assigned_event_name = participant.assigned_to_new.name
+                assigned_event_idx = event_names.index(assigned_event_name)  # Index of assigned event in event_names list
+                preference_assigned_event = Preferences[i][assigned_event_idx]  # Preference value for assigned event
+            else:
+                assigned_event_name = "Unassigned"
+                assigned_event_idx = None
+                preference_assigned_event = None
+                messages.warning(request, f"{participant.name} is not assigned to any event.")
+                continue  # Skip further checks for unassigned participants
+
 
             # Initialize a list to store possible coalitions for each alternative activity
             coalition_messages = []
@@ -739,8 +770,10 @@ def view_allocation_new(request):
                     # Construct B_set for participants who strictly prefer target event `b` over current assignment
                     B_set = [
                         k for k in range(len(participants))
-                        if Preferences[k][target_event_idx] >= Preferences[k][event_names.index(participants[k].assigned_to_new.name)]
+                        if participants[k].assigned_to_new and  # Ensure `assigned_to_new` is not None
+                        Preferences[k][target_event_idx] >= Preferences[k][event_names.index(participants[k].assigned_to_new.name)]
                     ]
+
 
                     print(f"Preferences for participants: {Preferences}")
                     print(f"B_set for {participant_names[i]} moving to {event_names[target_event_idx]}: {B_set}")
@@ -755,8 +788,9 @@ def view_allocation_new(request):
                             
                             # Define participants assigned to activity `c`
                             current_c_participants = [
-                                k for k in range(len(participants)) if participants[k].assigned_to_new.name == c_name
+                                k for k in range(len(participants)) if participants[k].assigned_to_new and participants[k].assigned_to_new.name == c_name
                             ]
+
                             
                             # Determine eligible participants from `c` who are in `B_set`
                             eligible_to_move_from_c = [p for p in current_c_participants if p in B_set]
@@ -792,9 +826,11 @@ def view_allocation_new(request):
                     )
                     
                     # Calculate the current number of participants assigned to `b`
+                    # Calculate the current number of participants assigned to `b`
                     current_b_participants = len([
-                        k for k in range(len(participants)) if participants[k].assigned_to_new.name == event_name
+                        k for k in range(len(participants)) if participants[k].assigned_to_new and participants[k].assigned_to_new.name == event_name
                     ])
+
 
                     # Capacity constraint for the target event
                     prob += (
@@ -854,10 +890,10 @@ def view_allocation_new(request):
             'individual_rationality_violations': individual_rationality_violations,
         })
 
-    except Exception as e:
-        print(e)
-        messages.error(request, 'Error viewing allocations!')
-        return render(request, 'Organizer/new_allocation.html')
+    # except Exception as e:
+    #     print(e)
+    #     messages.error(request, 'Error viewing allocations!')
+    #     return render(request, 'Organizer/new_allocation.html')
 
 
 def edit_allocation(request):
@@ -1361,7 +1397,6 @@ def allocate_activities_max(request):
                 participant.assigned_to_max = event
                 participant.save()
 
-        messages.success(request, "Core stable assignment has been successfully calculated and saved.")
         return redirect('view_allocation_max')
 
     except Exception as e:
