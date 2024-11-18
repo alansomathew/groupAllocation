@@ -1323,16 +1323,34 @@ def edit_allocation_new(request):
 
 
 # Activity Allocation Algorithm
+from pulp import LpProblem, LpVariable, LpBinary, LpMaximize, lpSum, value
+
 def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, participants, events):
+    """
+    Solve the activity assignment problem to allocate participants to events based on maximum preference.
+
+    Args:
+        n (int): Number of participants.
+        a (int): Number of activities/events.
+        min_bounds (list): Minimum bounds for each activity.
+        max_bounds (list): Maximum bounds for each activity.
+        Preferences (list): Matrix of preferences for each participant-event pair.
+        participants (list): List of participant names or objects.
+        events (list): List of event names or objects.
+
+    Returns:
+        assignments (list): List of (participant_idx, event_idx) assignments.
+        assigned_activities (list): List of event indices that are active.
+    """
     # Create the LP problem
-    prob = LpProblem("ActivityAssignment", LpMaximize)
+    prob = LpProblem("ActivityAssignmentMaxPreference", LpMaximize)
 
     # Decision variables
     x = LpVariable.dicts("x", ((i, j) for i in range(n) for j in range(a)), cat=LpBinary)  # x[i][j] = 1 if participant i is assigned to activity j
     y = LpVariable.dicts("y", (j for j in range(a)), cat=LpBinary)  # y[j] = 1 if activity j is assigned
 
-    # Objective function: Maximize total preference sum, ignoring negative preferences
-    prob += lpSum(max(0, Preferences[i][j]) * x[(i, j)] for i in range(n) for j in range(a)), "TotalPreferenceSum"
+    # Objective function: Maximize the total preferences for allocated participants
+    prob += lpSum(Preferences[i][j] * x[(i, j)] for i in range(n) for j in range(a) if Preferences[i][j] >= 0), "MaxPreferenceSum"
 
     # Constraints: Each participant can be assigned to at most one activity
     for i in range(n):
@@ -1351,7 +1369,18 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
     prob.solve()
 
     # Collect assignments and assigned activities
-    assignments = [(i, j) for i in range(n) for j in range(a) if value(x[(i, j)]) > 0.5]
+    assignments = []
+    for i in range(n):
+        assigned_event = None
+        max_preference = float('-inf')  # Track the maximum preference for each participant
+        for j in range(a):
+            if Preferences[i][j] >= 0 and value(x[(i, j)]) > 0.5:  # Check if assigned
+                if Preferences[i][j] > max_preference:
+                    max_preference = Preferences[i][j]
+                    assigned_event = j
+        if assigned_event is not None:
+            assignments.append((i, assigned_event))  # Add participant-to-event assignment
+
     assigned_activities = [j for j in range(a) if value(y[j]) > 0.5]
 
     return assignments, assigned_activities
