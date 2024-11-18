@@ -492,6 +492,7 @@ def view_allocation(request):
                         coalition_participants = [
                             participant_names[p] for p in B_set if any(h_vars[c_name][h].varValue == 1 for h in R_sets[c_name])
                         ]
+                        print(coalition_participants)
                         coalition_messages.append(
                             f"{participant_names[i]} could improve by moving to {event_names[target_event_idx]} with a coalition of "
                             f"{', '.join(coalition_participants)} from other activities."
@@ -770,8 +771,8 @@ def view_allocation_new(request):
                     # Construct B_set for participants who strictly prefer target event `b` over current assignment
                     B_set = [
                         k for k in range(len(participants))
-                        if participants[k].assigned_to_new and  # Ensure `assigned_to_new` is not None
-                        Preferences[k][target_event_idx] >= Preferences[k][event_names.index(participants[k].assigned_to_new.name)]
+                        if participants[k].assigned_to_new  # Check if assigned_to_new is not None
+                        and Preferences[k][target_event_idx] >= Preferences[k][event_names.index(participants[k].assigned_to_new.name)]
                     ]
 
 
@@ -785,16 +786,15 @@ def view_allocation_new(request):
                     for c_idx, c_name in enumerate(event_names):
                         if c_name != event_name:
                             Rc = set()  # Initialize Rc with feasible move counts
-                            
+
                             # Define participants assigned to activity `c`
                             current_c_participants = [
                                 k for k in range(len(participants)) if participants[k].assigned_to_new and participants[k].assigned_to_new.name == c_name
                             ]
 
-                            
                             # Determine eligible participants from `c` who are in `B_set`
                             eligible_to_move_from_c = [p for p in current_c_participants if p in B_set]
-                            
+
                             # Calculate Rc for feasible moves from `c` without violating capacity
                             for h in range(1, len(eligible_to_move_from_c) + 1):
                                 remaining_capacity = len(current_c_participants) - h
@@ -818,21 +818,19 @@ def view_allocation_new(request):
 
                     # Constraints: Select exactly one feasible value from each R_c
                     for c_name, h_var in h_vars.items():
-                        prob += lpSum(h_var[h] for h in R_sets[c_name]) == 1, f"OneValueFromR_{c_name}"
+                        prob += lpSum(h_var[h] for h in R_sets[c_name]) <= 1, f"OneValueFromR_{c_name}"
 
                     # Capacity constraint for target event `b` after coalition movement
                     total_move_to_b = lpSum(
                         h * h_vars[c_name][h] for c_name in R_sets for h in R_sets[c_name]
                     )
-                    
-                    # Calculate the current number of participants assigned to `b`
-                    # Calculate the current number of participants assigned to `b`
+
+                    # Current participants in the target event
                     current_b_participants = len([
                         k for k in range(len(participants)) if participants[k].assigned_to_new and participants[k].assigned_to_new.name == event_name
                     ])
 
-
-                    # Capacity constraint for the target event
+                    # Capacity constraint
                     prob += (
                         min_bounds[target_event_idx] <= current_b_participants + total_move_to_b <= max_bounds[target_event_idx],
                         "CapacityConstraint_TargetEvent"
@@ -841,22 +839,21 @@ def view_allocation_new(request):
                     # Solve the ILP model
                     prob.solve()
 
-                    # Check if the solution is feasible
+                    # Process ILP results
                     if LpStatus[prob.status] == 'Optimal':
-                        coalition_found = True
                         coalition_participants = [
                             participant_names[p] for p in B_set if any(h_vars[c_name][h].varValue == 1 for h in R_sets[c_name])
                         ]
+                        print(coalition_participants)
                         coalition_messages.append(
                             f"{participant_names[i]} could improve by moving to {event_names[target_event_idx]} with a coalition of "
                             f"{', '.join(coalition_participants)} from other activities."
                         )
-                        core_stability_violations.extend(coalition_messages)  # Add violations to the main list
+                        core_stability_violations.extend(coalition_messages)
                     else:
                         no_feasible_coalitions.append(
                             f"No feasible coalition found for {participant_names[i]} to move to {event_names[target_event_idx]}."
                         )
-
 
         # Process violation messages
         if individual_stability_violations:
@@ -1023,15 +1020,15 @@ def edit_allocation(request):
                 for c_idx, c_name in enumerate(event_names):
                     if c_name != event_name:
                         Rc = set()  # Initialize Rc with feasible move counts
-                        
+
                         # Define participants assigned to activity `c`
                         current_c_participants = [
-                            k for k in range(len(participants)) if participants[k].assigned_to.name == c_name
+                            k for k in range(len(participants)) if participants[k].assigned_to and participants[k].assigned_to.name == c_name
                         ]
-                        
+
                         # Determine eligible participants from `c` who are in `B_set`
                         eligible_to_move_from_c = [p for p in current_c_participants if p in B_set]
-                        
+
                         # Calculate Rc for feasible moves from `c` without violating capacity
                         for h in range(1, len(eligible_to_move_from_c) + 1):
                             remaining_capacity = len(current_c_participants) - h
@@ -1055,19 +1052,19 @@ def edit_allocation(request):
 
                 # Constraints: Select exactly one feasible value from each R_c
                 for c_name, h_var in h_vars.items():
-                    prob += lpSum(h_var[h] for h in R_sets[c_name]) == 1, f"OneValueFromR_{c_name}"
+                    prob += lpSum(h_var[h] for h in R_sets[c_name]) <= 1, f"OneValueFromR_{c_name}"
 
                 # Capacity constraint for target event `b` after coalition movement
                 total_move_to_b = lpSum(
                     h * h_vars[c_name][h] for c_name in R_sets for h in R_sets[c_name]
                 )
-                
-                # Calculate the current number of participants assigned to `b`
+
+                # Current participants in the target event
                 current_b_participants = len([
-                    k for k in range(len(participants)) if participants[k].assigned_to.name == event_name
+                    k for k in range(len(participants)) if participants[k].assigned_to and participants[k].assigned_to.name == event_name
                 ])
 
-                # Capacity constraint for the target event
+                # Capacity constraint
                 prob += (
                     min_bounds[target_event_idx] <= current_b_participants + total_move_to_b <= max_bounds[target_event_idx],
                     "CapacityConstraint_TargetEvent"
@@ -1076,17 +1073,17 @@ def edit_allocation(request):
                 # Solve the ILP model
                 prob.solve()
 
-                # Check if the solution is feasible
+                # Process ILP results
                 if LpStatus[prob.status] == 'Optimal':
-                    coalition_found = True
                     coalition_participants = [
                         participant_names[p] for p in B_set if any(h_vars[c_name][h].varValue == 1 for h in R_sets[c_name])
                     ]
+                    print(coalition_participants)
                     coalition_messages.append(
                         f"{participant_names[i]} could improve by moving to {event_names[target_event_idx]} with a coalition of "
                         f"{', '.join(coalition_participants)} from other activities."
                     )
-                    core_stability_violations.extend(coalition_messages)  # Add violations to the main list
+                    core_stability_violations.extend(coalition_messages)
                 else:
                     no_feasible_coalitions.append(
                         f"No feasible coalition found for {participant_names[i]} to move to {event_names[target_event_idx]}."
