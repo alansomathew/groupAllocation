@@ -1194,9 +1194,17 @@ def edit_allocation_new(request):
 
     # Core Stability Check
     for i, participant in enumerate(participants):
-        assigned_event_name = participant.assigned_to_new.name  # Current assigned event for participant
-        assigned_event_idx = event_names.index(assigned_event_name)  # Index of assigned event in event_names list
-        preference_assigned_event = Preferences[i][assigned_event_idx]  # Preference value for assigned event
+        if participant.assigned_to_new:
+            assigned_event_name = participant.assigned_to_new.name
+            assigned_event_idx = event_names.index(assigned_event_name)  # Index of assigned event in event_names list
+            preference_assigned_event = Preferences[i][assigned_event_idx]  # Preference value for assigned event
+        else:
+            assigned_event_name = "Unassigned"
+            assigned_event_idx = None
+            preference_assigned_event = None
+            messages.warning(request, f"{participant.name} is not assigned to any event.")
+            continue  # Skip further checks for unassigned participants
+
 
         # Initialize a list to store possible coalitions for each alternative activity
         coalition_messages = []
@@ -1224,10 +1232,13 @@ def edit_allocation_new(request):
                 target_event_idx = j  # The index for the target event `b`
 
                 # Construct B_set for participants who strictly prefer target event `b` over current assignment
+                # Construct B_set for participants who strictly prefer target event `b` over current assignment
                 B_set = [
                     k for k in range(len(participants))
-                    if Preferences[k][target_event_idx] >= Preferences[k][event_names.index(participants[k].assigned_to_new.name)]
+                    if participants[k].assigned_to_new  # Ensure assigned_to_new is not None
+                    and Preferences[k][target_event_idx] >= Preferences[k][event_names.index(participants[k].assigned_to_new.name)]
                 ]
+
 
                 print(f"Preferences for participants: {Preferences}")
                 print(f"B_set for {participant_names[i]} moving to {event_names[target_event_idx]}: {B_set}")
@@ -1239,15 +1250,16 @@ def edit_allocation_new(request):
                 for c_idx, c_name in enumerate(event_names):
                     if c_name != event_name:
                         Rc = set()  # Initialize Rc with feasible move counts
-                        
+
                         # Define participants assigned to activity `c`
                         current_c_participants = [
-                            k for k in range(len(participants)) if participants[k].assigned_to_new.name == c_name
+                            k for k in range(len(participants))
+                            if participants[k].assigned_to_new and participants[k].assigned_to_new.name == c_name
                         ]
-                        
+
                         # Determine eligible participants from `c` who are in `B_set`
                         eligible_to_move_from_c = [p for p in current_c_participants if p in B_set]
-                        
+
                         # Calculate Rc for feasible moves from `c` without violating capacity
                         for h in range(1, len(eligible_to_move_from_c) + 1):
                             remaining_capacity = len(current_c_participants) - h
@@ -1277,11 +1289,13 @@ def edit_allocation_new(request):
                 total_move_to_b = lpSum(
                     h * h_vars[c_name][h] for c_name in R_sets for h in R_sets[c_name]
                 )
-                
+
                 # Calculate the current number of participants assigned to `b`
                 current_b_participants = len([
-                    k for k in range(len(participants)) if participants[k].assigned_to_new.name == event_name
+                    k for k in range(len(participants))
+                    if participants[k].assigned_to_new and participants[k].assigned_to_new.name == event_name
                 ])
+
 
                 # Capacity constraint for the target event
                 prob += (
@@ -1307,6 +1321,7 @@ def edit_allocation_new(request):
                     no_feasible_coalitions.append(
                         f"No feasible coalition found for {participant_names[i]} to move to {event_names[target_event_idx]}."
                     )
+
 
 
     # Display stability results
