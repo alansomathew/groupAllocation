@@ -14,6 +14,7 @@ AllocationAdmin/migrations
 AllocationAdmin/migrations/
 groupAllocation/__pycache__
 groupAllocation/__pycache__/
+groupAllocation/__pycache__/
 user/__pycache__
 user/__pycache__/
 user/migrations
