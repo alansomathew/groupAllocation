@@ -1353,7 +1353,7 @@ def edit_allocation_new(request):
 def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, participants, events):
     """
     Solve the activity assignment problem to allocate participants to events based on maximum preference.
-    If all preferences are negative, assign the participant to the event with the smallest (least negative) preference.
+    If all preferences are negative, assign the participant to the event with the least negative preference.
 
     Args:
         n (int): Number of participants.
@@ -1372,13 +1372,13 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
     prob = LpProblem("ActivityAssignmentMaxPreference", LpMaximize)
 
     # Decision variables
-    x = LpVariable.dicts("x", ((i, j) for i in range(n) for j in range(a)), cat=LpBinary)  # x[i][j] = 1 if participant i is assigned to activity j
-    y = LpVariable.dicts("y", (j for j in range(a)), cat=LpBinary)  # y[j] = 1 if activity j is assigned
+    x = LpVariable.dicts("x", ((i, j) for i in range(n) for j in range(a)), cat="Binary")  # x[i][j] = 1 if participant i is assigned to activity j
+    y = LpVariable.dicts("y", (j for j in range(a)), cat="Binary")  # y[j] = 1 if activity j is assigned
 
-    # Objective function: Maximize the total preferences for allocated participants
+    # Objective function: Maximize the total preferences for all participants
     prob += lpSum(Preferences[i][j] * x[(i, j)] for i in range(n) for j in range(a)), "MaxPreferenceSum"
 
-    # Constraints: Each participant can be assigned to at most one activity
+    # Constraints: Each participant must be assigned to exactly one activity
     for i in range(n):
         prob += lpSum(x[(i, j)] for j in range(a)) == 1, f"Participant_{i}_Assignment"
 
@@ -1405,12 +1405,11 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
                     max_preference = Preferences[i][j]
                     assigned_event = j
 
-        # Handle case where all preferences are negative
+        # If no assignment is made, assign to the least negative preference (in rare cases of solver issues)
         if assigned_event is None:
-            smallest_negative_event = Preferences[i].index(max(Preferences[i]))
-            assignments.append((i, smallest_negative_event))
-        else:
-            assignments.append((i, assigned_event))
+            assigned_event = Preferences[i].index(max(Preferences[i]))
+
+        assignments.append((i, assigned_event))
 
     assigned_activities = [j for j in range(a) if value(y[j]) > 0.5]
 
