@@ -703,9 +703,9 @@ def view_allocation_new(request):
 
         # Check assignment status
         for participant in participants:
-            if participant.assigned_to:  # Participant is assigned
+            if participant.assigned_to_new:  # Participant is assigned
                 assigned_participants.add(participant.name)
-                events_with_participants.add(participant.assigned_to.name)
+                events_with_participants.add(participant.assigned_to_new.name)
 
         # Check if all participants are assigned
         unassigned_participants = set(participant_names) - assigned_participants
@@ -1405,8 +1405,9 @@ def solve_activity_assignment_max(n, a, min_bounds, max_bounds, Preferences, par
                     max_preference = Preferences[i][j]
                     assigned_event = j
 
-        # If no assignment is made, assign to the least negative preference (in rare cases of solver issues)
+        # If no assignment is made due to solver issues, assign to the least negative preference
         if assigned_event is None:
+            # Find the event with the least negative preference
             assigned_event = Preferences[i].index(max(Preferences[i]))
 
         assignments.append((i, assigned_event))
